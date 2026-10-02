@@ -465,8 +465,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f2d1ec18e7b9934ea0177dc4fc1076c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DummyPublisher
-  port: 5555
-  rateHz: 10
+  sensorPort: 5555
+  commandPort: 5556
+  rateHz: 50
+  car: {fileID: 1883981944}
 --- !u!1 &1607979472
 GameObject:
   m_ObjectHideFlags: 0
@@ -733,7 +735,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e41f97d5260abd548a5435d10db4c33c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ConstantSpeedCar
-  speed: 10
+  speed: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
