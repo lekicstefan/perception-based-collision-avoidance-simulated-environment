@@ -10,7 +10,7 @@
 | Build target | Standalone player |
 | Render pipeline | 3D (Built-In Render Pipeline) v9.1.0 |
 | Installed modules | Windows Build Support (IL2CPP) |
-| Packages | Unity UI 2.0.0 / Timeline 1.8.6 / Input System 1.12.0 / com.unity.collab-proxy 2.3.1 / com.unity.visualscripting 1.9.2 / com.unity.feature.development 1.0.2 |
+| Packages | Unity UI 2.0.0 / Timeline 1.8.6 / Input System 1.12.0 / com.unity.collab-proxy 2.3.1 / com.unity.visualscripting 1.9.2 / com.unity.feature.development 1.0.2 / NuGetForUnity 4.5.0 / NetMQ 4.0.4.3 |
 
 ## Python
 
