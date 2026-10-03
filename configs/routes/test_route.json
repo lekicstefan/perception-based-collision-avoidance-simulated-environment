@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "name": "test_route",
+  "waypoints": [
+    {"x": 0,   "z": 0,   "elevation": 0},
+    {"x": 0,   "z": 40,  "elevation": 0},
+    {"x": 5,   "z": 80,  "elevation": 1},
+    {"x": 20,  "z": 115, "elevation": 3},
+    {"x": 45,  "z": 140, "elevation": 5},
+    {"x": 80,  "z": 155, "elevation": 5},
+    {"x": 120, "z": 160, "elevation": 3},
+    {"x": 160, "z": 160, "elevation": 0}
+  ]
+}
