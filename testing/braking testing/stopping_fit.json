@@ -1,0 +1,12 @@
+{
+  "source": "stopping_table.csv",
+  "n_points": 9,
+  "a_max_assumed": 8.0,
+  "t_eff_s": 0.1498,
+  "rmse_m": 0.0013,
+  "free_fit": {
+    "intercept_m": -0.0035,
+    "t_s": 0.15,
+    "a_ms2": 8.0
+  }
+}

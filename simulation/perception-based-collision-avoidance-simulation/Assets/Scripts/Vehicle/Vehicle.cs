@@ -34,6 +34,7 @@ public class Vehicle : MonoBehaviour
     float[] delayLine;
     int delayIdx;
     bool warnedRear, warnedFront;
+    bool frozen;
 
     public double X { get { return px; } }
     public double Z { get { return pz; } }
@@ -79,6 +80,26 @@ public class Vehicle : MonoBehaviour
     public float Jerk { get { return jerk; } }     // m/s^3 (not counted at the moment of stopping)
     public float YawRate { get { return (float)(speed / wheelbase * System.Math.Tan(steer)); } }
     public float PitchDeg { get { return pitch * Mathf.Rad2Deg; } }
+    public bool IsFrozen { get { return frozen; } }
+
+    // Stops the vehicle for good (end of run, e.g. after a collision).
+    public void Freeze()
+    {
+        frozen = true;
+        speed = 0f;
+        accel = 0f;
+        jerk = 0f;
+        requestedAccel = 0f;
+    }
+
+    // Clears the longitudinal state: acceleration, request and the actuation delay line.
+    public void ResetLongitudinal()
+    {
+        accel = 0f;
+        jerk = 0f;
+        requestedAccel = 0f;
+        System.Array.Clear(delayLine, 0, delayLine.Length);
+    }
 
     void Awake()
     {
@@ -102,6 +123,8 @@ public class Vehicle : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (frozen) return;
+
         float dt = Time.fixedDeltaTime;
 
         // 1. actuation delay: the request from N steps ago reaches the actuators now
