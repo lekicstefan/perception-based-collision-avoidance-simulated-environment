@@ -24,6 +24,10 @@ public class RouteDriver : MonoBehaviour
     [Header("Logging")]
     public float logInterval = 5f;         // s of simulation time
 
+    [Header("Output")]
+    public bool writeAccelToVehicle = true; // the command executor switches this off and takes over
+    public float DesiredAccel { get; private set; }
+
     public Route Track { get; private set; }
     public float S { get; private set; }            // arc length of the closest route point
     public float CrossTrack { get; private set; }   // m, + = vehicle is left of the route
@@ -81,7 +85,8 @@ public class RouteDriver : MonoBehaviour
         {
             Finished = true;
             vehicle.RequestedSteering = 0f;
-            vehicle.RequestedAccel = -driverMaxBrake;
+            DesiredAccel = -driverMaxBrake;
+            if (writeAccelToVehicle) vehicle.RequestedAccel = DesiredAccel;
             if (!reported && vehicle.Speed <= 0f)
             {
                 reported = true;
@@ -107,6 +112,7 @@ public class RouteDriver : MonoBehaviour
         profile.At(S, out vTarget, out aFf);
         TargetSpeed = vTarget;
         float aReq = aFf + speedGain * (vTarget - vehicle.Speed);
-        vehicle.RequestedAccel = Mathf.Clamp(aReq, -driverMaxBrake, vehicle.maxAccel);
+        DesiredAccel = Mathf.Clamp(aReq, -driverMaxBrake, vehicle.maxAccel);
+        if (writeAccelToVehicle) vehicle.RequestedAccel = DesiredAccel;
     }
 }
