@@ -18,8 +18,9 @@ public class CameraSensor : MonoBehaviour
 
     public event System.Action<CameraFrame> FrameReady;   // raised on the main thread
     public CameraFrame LastFrame { get; private set; }
+    public PoseEstimator poseEstimator;
 
-    struct Job { public int frameId; public double timestamp; public byte[] rgba; public long wallStart; }
+    struct Job { public int frameId; public double timestamp; public byte[] rgba; public long wallStart; public PoseState pose; }
 
     CameraConfig cfg;
     Camera cam;
@@ -153,17 +154,18 @@ public class CameraSensor : MonoBehaviour
         cam.Render();
         int id = frameId++;
         long wall = System.Diagnostics.Stopwatch.GetTimestamp();
-        AsyncGPUReadback.Request(rt, 0, TextureFormat.RGBA32, req => OnReadback(req, id, now, wall));
+        PoseState p = poseEstimator != null ? poseEstimator.Current : default(PoseState);
+        AsyncGPUReadback.Request(rt, 0, TextureFormat.RGBA32, req => OnReadback(req, id, now, wall, p));
     }
 
-    void OnReadback(AsyncGPUReadbackRequest req, int id, double t, long wall)
+    void OnReadback(AsyncGPUReadbackRequest req, int id, double t, long wall, PoseState p)
     {
         if (jobs == null || jobs.IsAddingCompleted) return;
         if (req.hasError) { readbackErrors++; return; }
         byte[] buf;
         if (!pool.TryDequeue(out buf)) buf = new byte[cfg.width * cfg.height * 4];
         req.GetData<byte>().CopyTo(buf);
-        if (!jobs.TryAdd(new Job { frameId = id, timestamp = t, rgba = buf, wallStart = wall }))
+        if (!jobs.TryAdd(new Job { frameId = id, timestamp = t, rgba = buf, wallStart = wall, pose = p }))
         {
             dropped++;
             pool.Enqueue(buf);
@@ -215,7 +217,7 @@ public class CameraSensor : MonoBehaviour
             data = ImageConversion.EncodeArrayToJPG(enc, GraphicsFormat.R8G8B8_SRGB, (uint)w, (uint)h, 0, cfg.jpegQuality);
         }
         float ms = (float)((System.Diagnostics.Stopwatch.GetTimestamp() - job.wallStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
-        return new CameraFrame { timestamp = job.timestamp, frameId = job.frameId, width = w, height = h, format = cfg.format, data = data, latencyMs = ms };
+        return new CameraFrame { timestamp = job.timestamp, frameId = job.frameId, width = w, height = h, format = cfg.format, data = data, latencyMs = ms, pose = job.pose };
     }
 
     // ---- main thread ----
@@ -239,7 +241,8 @@ public class CameraSensor : MonoBehaviour
                     " bytes | checksum " + h.ToString("X8") + " | latency ms min/avg/max " + latMin.ToString("F1") + "/" +
                     (latSum / Mathf.Max(1, delivered)).ToString("F1") + "/" + latMax.ToString("F1") +
                     " | dropped " + dropped + " | readback errors " + readbackErrors +
-                    (cfg.postProcessing.noiseEnabled ? " | noise rms " + lastNoiseRms.ToString("F2") : ""));
+                    (cfg.postProcessing.noiseEnabled ? " | noise rms " + lastNoiseRms.ToString("F2") : "") +
+                    " | pose stamp " + f.pose.timestamp.ToString("F3"));
                 latSum = 0f; latMin = 1e9f; latMax = 0f; delivered = 0;
             }
             if (FrameReady != null) FrameReady(f);
