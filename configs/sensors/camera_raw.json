@@ -1,0 +1,4 @@
+{
+  "name": "camera_raw",
+  "camera": { "format": "raw" }
+}
