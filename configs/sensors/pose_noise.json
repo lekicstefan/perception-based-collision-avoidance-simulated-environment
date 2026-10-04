@@ -1,0 +1,4 @@
+{
+  "name": "pose_noise",
+  "pose": { "noiseEnabled": true }
+}
