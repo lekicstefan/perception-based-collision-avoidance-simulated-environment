@@ -1,0 +1,10 @@
+{
+  "name": "lidar_64",
+  "lidar": {
+    "elevationGroups": [
+      { "count": 24, "fromDeg": -20.0, "toDeg": -4.0, "includeFrom": true,  "includeTo": false },
+      { "count": 32, "fromDeg": -4.0,  "toDeg": 4.0,  "includeFrom": true,  "includeTo": true  },
+      { "count": 8,  "fromDeg": 4.0,   "toDeg": 10.0, "includeFrom": false, "includeTo": true  }
+    ]
+  }
+}
