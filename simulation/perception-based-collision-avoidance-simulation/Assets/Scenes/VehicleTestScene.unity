@@ -385,7 +385,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &757825594
 Transform:
   m_ObjectHideFlags: 0
@@ -421,6 +421,7 @@ GameObject:
   - component: {fileID: 935829887}
   - component: {fileID: 935829888}
   - component: {fileID: 935829889}
+  - component: {fileID: 935829890}
   m_Layer: 0
   m_Name: Executor
   m_TagString: Untagged
@@ -559,11 +560,24 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 935829881}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2cf13a4cbf0493749b176b457429499b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraPostProcessingTest
+--- !u!114 &935829890
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 935829881}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fb4f9352c39d0843ba93fb00eba6707, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PoseTest
+  configName: pose_noise
 --- !u!1 &985963075
 GameObject:
   m_ObjectHideFlags: 0
@@ -906,13 +920,13 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1128943755}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 63f341c9700c46a4fa4b025e32b69101, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RouteDriver
   vehicle: {fileID: 1128943756}
-  routeFile: routes/straight_long.json
+  routeFile: routes/curves.json
   cruiseSpeed: 14
   maxLateralAccel: 3
   comfortDecel: 2
@@ -1208,6 +1222,7 @@ GameObject:
   - component: {fileID: 1541853450}
   - component: {fileID: 1541853451}
   - component: {fileID: 1541853449}
+  - component: {fileID: 1541853452}
   m_Layer: 0
   m_Name: Sensors
   m_TagString: Untagged
@@ -1265,7 +1280,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1541853446}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5464962cab1f69f45b177eb51cc197c9, type: 3}
   m_Name: 
@@ -1278,6 +1293,7 @@ MonoBehaviour:
   gizmoStride: 1
   showStats: 1
   logEveryScans: 50
+  poseEstimator: {fileID: 1541853452}
 --- !u!114 &1541853451
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1299,6 +1315,24 @@ MonoBehaviour:
   showPreview: 1
   previewEveryN: 3
   logEveryFrames: 60
+  poseEstimator: {fileID: 1541853452}
+--- !u!114 &1541853452
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541853446}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aaecdb14e690cac44807f8fb9649bccf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PoseEstimator
+  rig: {fileID: 1541853447}
+  vehicle: {fileID: 1128943756}
+  drawGizmo: 1
+  showStats: 1
+  logInterval: 5
 --- !u!1 &1580507178
 GameObject:
   m_ObjectHideFlags: 0
@@ -1648,7 +1682,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cfe3069b4ed1f934faaef21f6e1e909d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RouteRoadMesh
-  routeFile: routes/straight_long.json
+  vehicle: {fileID: 1128943756}
   width: 7
   spacing: 1
 --- !u!64 &1800529835

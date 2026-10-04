@@ -14,6 +14,7 @@ public class LidarSensor : MonoBehaviour
 
     public event System.Action<LidarScan> ScanReady;
     public LidarScan LastScan { get; private set; }
+    public PoseEstimator poseEstimator;
 
     LidarConfig cfg;
     int rows, cols, n, frameId;
@@ -83,7 +84,16 @@ public class LidarSensor : MonoBehaviour
         JobHandle handle = RaycastCommand.ScheduleBatch(commands, results, 64, 1, default(JobHandle));
         handle.Complete();
 
-        var scan = new LidarScan { timestamp = now, frameId = frameId++, rows = rows, cols = cols, ranges = new ushort[n] };
+        var scan = new LidarScan
+        {
+            timestamp = now,
+            frameId = frameId++,
+            rows = rows,
+            cols = cols,
+            ranges = new ushort[n],
+            pose = poseEstimator != null ? poseEstimator.Current : default(PoseState)
+        };
+
         Process(scan.ranges);
         LastScan = scan;
         lastChecksum = Checksum(scan.ranges);
@@ -93,7 +103,8 @@ public class LidarSensor : MonoBehaviour
             UnityEngine.Debug.Log("LIDAR scan " + scan.frameId + " t=" + now.ToString("F3") + " | valid " + lastValid +
                 " (ground-like " + lastGround + " [" + gMin.ToString("F2") + ", " + gMax.ToString("F2") + "] m, other " + lastOther +
                 " [" + oMin.ToString("F2") + ", " + oMax.ToString("F2") + "] m) | no return " + lastNone + " | sky/max range " + lastSky +
-                " | checksum " + lastChecksum.ToString("X8") + " | compute " + lastMs.ToString("F2") + " ms");
+                " | checksum " + lastChecksum.ToString("X8") + " | compute " + lastMs.ToString("F2") + " ms" +
+                " | pose stamp " + scan.pose.timestamp.ToString("F3"));
 
         if (ScanReady != null) ScanReady(scan);
     }
@@ -113,7 +124,7 @@ public class LidarSensor : MonoBehaviour
 
             RaycastHit hit = results[i];
             debugClass[i] = 0;
-            if (hit.colliderInstanceID == 0)   // nothing within range
+            if (hit.colliderEntityId == 0)   // nothing within range
             {
                 img[i] = LidarScan.MaxRangeOrSky;
                 lastSky++;

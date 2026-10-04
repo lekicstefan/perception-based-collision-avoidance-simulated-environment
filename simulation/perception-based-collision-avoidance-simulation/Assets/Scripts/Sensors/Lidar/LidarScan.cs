@@ -7,4 +7,5 @@ public class LidarScan
     public int frameId;
     public int rows, cols;
     public ushort[] ranges;    // centimetres, row-major, row 0 = highest beam, column 0 = leftmost
+    public PoseState pose;     // ego state at the capture step
 }

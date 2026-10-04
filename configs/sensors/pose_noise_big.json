@@ -1,0 +1,10 @@
+{
+  "name": "pose_noise_big",
+  "pose": {
+    "noiseEnabled": true,
+    "positionNoiseStdM": 0.5,
+    "yawNoiseStdDeg": 2.0,
+    "positionBiasWalkMPerSqrtS": 0.2,
+    "yawBiasWalkDegPerSqrtS": 0.2
+  }
+}
