@@ -1,0 +1,4 @@
+{
+  "name": "lidar_clean",
+  "lidar": { "rangeNoiseStdM": 0.0, "dropoutProbability": 0.0 }
+}
