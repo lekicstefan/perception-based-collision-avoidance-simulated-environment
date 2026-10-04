@@ -1,0 +1,11 @@
+{
+  "name": "camera_lowlight",
+  "camera": {
+    "postProcessing": {
+      "exposureEnabled": true,
+      "exposureGain": 0.25,
+      "noiseEnabled": true,
+      "noiseStd": 4.0
+    }
+  }
+}
