@@ -1,0 +1,6 @@
+{
+  "name": "rates_odd",
+  "camera": { "rateHz": 22.0 },
+  "lidar": { "rateHz": 15.0 },
+  "pose": { "rateHz": 35.0 }
+}

@@ -422,6 +422,7 @@ GameObject:
   - component: {fileID: 935829888}
   - component: {fileID: 935829889}
   - component: {fileID: 935829890}
+  - component: {fileID: 935829891}
   m_Layer: 0
   m_Name: Executor
   m_TagString: Untagged
@@ -578,6 +579,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PoseTest
   configName: pose_noise
+--- !u!114 &935829891
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 935829881}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 567d5bf6bdf00b94a910582816ceb652, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CalibrationTest
+  configName: default
+  vehicle: {fileID: 1128943756}
+  egoBox: {fileID: 176234558}
 --- !u!1 &985963075
 GameObject:
   m_ObjectHideFlags: 0
@@ -1223,6 +1239,7 @@ GameObject:
   - component: {fileID: 1541853451}
   - component: {fileID: 1541853449}
   - component: {fileID: 1541853452}
+  - component: {fileID: 1541853453}
   m_Layer: 0
   m_Name: Sensors
   m_TagString: Untagged
@@ -1333,6 +1350,21 @@ MonoBehaviour:
   drawGizmo: 1
   showStats: 1
   logInterval: 5
+--- !u!114 &1541853453
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541853446}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f3418283aad02f4cacf61cf8e93a213, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CalibrationProvider
+  rig: {fileID: 1541853447}
+  vehicle: {fileID: 1128943756}
+  egoBox: {fileID: 176234558}
 --- !u!1 &1580507178
 GameObject:
   m_ObjectHideFlags: 0
