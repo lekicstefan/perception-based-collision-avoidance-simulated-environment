@@ -22,6 +22,28 @@ public class PoseEstimator : MonoBehaviour
     double nextLog;
 
     public void ResetOrigin() { haveOrigin = false; }
+    public bool HasOrigin { get { return haveOrigin; } }
+
+    public void WorldToStart(Vector3 p, out double x, out double y, out double z)
+    {
+        double ignoredYaw;
+        ToStartFrame(x0, z0, psi0, p.x, p.z, psi0, out x, out y, out ignoredYaw);
+        z = p.y - y0;
+    }
+
+    public void VelocityToStart(Vector3 v, out double vx, out double vy)
+    {
+        double c = System.Math.Cos(psi0), s = System.Math.Sin(psi0);
+        vx = v.x * c + v.z * s;
+        vy = -v.x * s + v.z * c;
+    }
+
+    // Unity yaw in degrees -> start-frame yaw in radians
+    public double YawToStart(float unityYawDeg)
+    {
+        double psi = (90.0 - unityYawDeg) * System.Math.PI / 180.0;
+        return System.Math.IEEERemainder(psi - psi0, 2.0 * System.Math.PI);
+    }
 
     // Unity ground-plane pose -> start frame (x forward, y left). psi is CCW from +X seen from above.
     public static void ToStartFrame(double x0, double z0, double psi0, double x, double z, double psi,
