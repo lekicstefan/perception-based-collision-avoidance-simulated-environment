@@ -12,6 +12,8 @@ public class LidarSensor : MonoBehaviour
     public bool showStats = true;       // on-screen line
     public int logEveryScans = 50;
 
+    public int[] GroundTruthHitIds { get; private set; }
+    public float[] GroundTruthHitRanges { get; private set; }
     public event System.Action<LidarScan> ScanReady;
     public LidarScan LastScan { get; private set; }
     public PoseEstimator poseEstimator;
@@ -60,6 +62,8 @@ public class LidarSensor : MonoBehaviour
         rng = new System.Random(rig.DerivedSeed("lidar"));
         schedule = new SensorSchedule(cfg.rateHz);
         debugClass = new byte[n];
+        GroundTruthHitIds = new int[n];
+        GroundTruthHitRanges = new float[n];
         bufGround = new Vector3[2 * n];
         bufOther = new Vector3[2 * n];
         if (excludeLayers.value == 0)
@@ -123,6 +127,8 @@ public class LidarSensor : MonoBehaviour
             double u1 = rng.NextDouble(), u2 = rng.NextDouble();
 
             RaycastHit hit = results[i];
+            GroundTruthHitIds[i] = hit.colliderEntityId;
+            GroundTruthHitRanges[i] = hit.distance;
             debugClass[i] = 0;
             if (hit.colliderEntityId == 0)   // nothing within range
             {
@@ -151,8 +157,7 @@ public class LidarSensor : MonoBehaviour
 
             float noise = 0f;
             if (cfg.rangeNoiseStdM > 0f)
-                noise = (float)(cfg.rangeNoiseStdM * System.Math.Sqrt(-2.0 * System.Math.Log(System.Math.Max(u1, 1e-12))) *
-                                System.Math.Cos(2.0 * System.Math.PI * u2));
+                noise = (float)(cfg.rangeNoiseStdM * System.Math.Sqrt(-2.0 * System.Math.Log(System.Math.Max(u1, 1e-12))) * System.Math.Cos(2.0 * System.Math.PI * u2));
             float dn = Mathf.Clamp(d + noise, 0.01f, maxR);
             img[i] = (ushort)Mathf.Clamp(Mathf.RoundToInt(dn * 100f), 1, 65534);
             lastValid++;
