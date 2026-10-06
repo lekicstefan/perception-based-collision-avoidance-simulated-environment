@@ -37,6 +37,10 @@ public class LidarSensor : MonoBehaviour
     uint lastChecksum;
     float gMin, gMax, oMin, oMax;
 
+    // for checks and ground truth only
+    public Vector3 LastOrigin { get { return lastOrigin; } }
+    public Vector3 CellDirectionWorld(int i) { return lastRot * localDirs[i]; }
+
     void Start()
     {
         cfg = rig.Config.lidar;
