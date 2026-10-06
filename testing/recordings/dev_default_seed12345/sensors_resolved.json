@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "name": "default",
+  "seed": 12345,
+  "camera": {
+    "enabled": true,
+    "width": 640,
+    "height": 360,
+    "rateHz": 30.0,
+    "horizontalFovDeg": 90.0,
+    "mount": {
+      "x": 1.8,
+      "y": 0.0,
+      "z": 1.3,
+      "yawDeg": 0.0,
+      "pitchDeg": 0.0,
+      "rollDeg": 0.0
+    },
+    "format": "jpeg",
+    "jpegQuality": 85,
+    "postProcessing": {
+      "noiseEnabled": false,
+      "noiseStd": 3.0,
+      "blurEnabled": false,
+      "blurSigmaPx": 1.5,
+      "exposureEnabled": false,
+      "exposureGain": 1.0
+    }
+  },
+  "lidar": {
+    "enabled": true,
+    "mount": {
+      "x": 1.3,
+      "y": 0.0,
+      "z": 1.8,
+      "yawDeg": 0.0,
+      "pitchDeg": 0.0,
+      "rollDeg": 0.0
+    },
+    "elevationsDeg": [],
+    "elevationGroups": [
+      {
+        "count": 12,
+        "fromDeg": -20.0,
+        "toDeg": -4.0,
+        "includeFrom": true,
+        "includeTo": false
+      },
+      {
+        "count": 16,
+        "fromDeg": -4.0,
+        "toDeg": 4.0,
+        "includeFrom": true,
+        "includeTo": true
+      },
+      {
+        "count": 4,
+        "fromDeg": 4.0,
+        "toDeg": 10.0,
+        "includeFrom": false,
+        "includeTo": true
+      }
+    ],
+    "horizontalFovDeg": 120.0,
+    "horizontalResolutionDeg": 0.2,
+    "maxRangeM": 100.0,
+    "rateHz": 10.0,
+    "rangeNoiseStdM": 0.02,
+    "dropoutProbability": 0.01,
+    "grazingDropoutEnabled": false,
+    "grazingStartDeg": 85.0,
+    "grazingEndDeg": 90.0,
+    "fogSensitivity": 1.0
+  },
+  "pose": {
+    "rateHz": 50.0,
+    "noiseEnabled": false,
+    "positionNoiseStdM": 0.05,
+    "yawNoiseStdDeg": 0.1,
+    "positionBiasWalkMPerSqrtS": 0.02,
+    "yawBiasWalkDegPerSqrtS": 0.02
+  }
+}

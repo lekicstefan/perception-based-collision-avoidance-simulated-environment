@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "name": "dev_road",
+  "waypoints": [
+    {"x": 0, "z": 0, "elevation": 0},
+    {"x": 0, "z": 80, "elevation": 0},
+    {"x": 0, "z": 160, "elevation": 0}
+  ]
+}
