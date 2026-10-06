@@ -5,6 +5,6 @@ public class CameraFrame
     public int width, height;
     public string format;      // "jpeg" or "raw"
     public byte[] data;        // JPEG file, or raw RGB (top row first, 3 bytes per pixel, sRGB)
-    public float latencyMs;    // wall-clock time from capture to delivery (readback, processing, encoding)
+    public float latencyMs;    // SIMULATOR DIAGNOSTIC ONLY (wall-clock capture to delivery). Never serialized; the boundary test (4.9) fails if it appears in a message.
     public PoseState pose;     // ego state at the capture step
 }
