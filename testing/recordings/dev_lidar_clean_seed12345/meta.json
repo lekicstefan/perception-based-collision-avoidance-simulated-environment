@@ -1,0 +1,16 @@
+{
+  "formatVersion": 1,
+  "scene": "dev",
+  "sensorConfig": "lidar_clean",
+  "seed": 12345,
+  "unityVersion": "6000.3.25f1",
+  "fixedDeltaTime": 0.009999993,
+  "rows": 32,
+  "cols": 600,
+  "lidarRateHz": 10.0,
+  "cameraRateHz": 30.0,
+  "cameraFormat": "jpeg",
+  "poseRateHz": 50.0,
+  "recordedAtUtc": "2026-10-06T20:58:53.6140356Z",
+  "lidarRecord": "int32 frame, float64 t, float64[6] pose (x y z yaw pitch roll), float32[3] (speed yawRate steering), uint16[rows*cols] ranges in cm, row-major, little-endian, packed"
+}

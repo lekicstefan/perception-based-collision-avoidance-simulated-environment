@@ -5,14 +5,14 @@ using UnityEngine;
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
 public class RouteRoadMesh : MonoBehaviour
 {
-    //public string routeFile = "routes/hill_straight.json";
+    public string routeFile;
     public Vehicle vehicle;     // Used for copying the route file selected on the Vehicle object. Makes is so that the selection only needs to be made in one place.
     public float width = 7f;
     public float spacing = 1f;
 
     void Awake()
     {
-        Route r = RouteIO.Build(RouteIO.Read(ConfigPaths.Resolve(vehicle.GetComponent<RouteDriver>().routeFile)));
+        Route r = RouteIO.Build(RouteIO.Read(routeFile.Equals("") ? ConfigPaths.Resolve(vehicle.GetComponent<RouteDriver>().routeFile) : routeFile));
         int n = Mathf.CeilToInt(r.Length / spacing) + 1;
         float ds = r.Length / (n - 1);
 
