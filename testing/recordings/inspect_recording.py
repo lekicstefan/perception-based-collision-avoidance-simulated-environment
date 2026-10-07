@@ -47,7 +47,7 @@ if (folder / "ego.csv").exists():
         g = haz[haz.id == row["id"]]
         v = g.iloc[1:]
         moving = v[v.speed > 0.01]
-        vel = f"({moving.vx.mean():.2f}, {moving.vy.mean():.2f}) while moving" if len(moving) else "stationary"
+        vel = f"({moving.vx.median():.2f}, {moving.vy.median():.2f}) while moving" if len(moving) else "stationary"
         print(f"  #{row['id']} {row['label']}: start ({g.x.iloc[0]:.2f}, {g.y.iloc[0]:.2f}, {g.z.iloc[0]:.2f}), "
               f"yaw {np.degrees(g.yaw_rad.iloc[0]):.0f} deg, velocity {vel}")
 
