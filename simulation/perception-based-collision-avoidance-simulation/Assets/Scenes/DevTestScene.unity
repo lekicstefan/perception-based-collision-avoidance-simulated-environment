@@ -1189,7 +1189,7 @@ MonoBehaviour:
   driver: {fileID: 1128943761}
   capGain: 1
   enforceExpiry: 1
-  logCommands: 1
+  logCommands: 0
 --- !u!4 &935829885
 Transform:
   m_ObjectHideFlags: 0
@@ -1311,12 +1311,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 935829881}
   m_Enabled: 0
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 68e44df5f72113b4ab98add5fe968452, type: 3}
+  m_Script: {fileID: 11500000, guid: f1e6d05832e0c8d44ba18225a23458be, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OracleFeed
-  oracleMode: 0
-  lidar: {fileID: 1541853450}
-  pose: {fileID: 1541853452}
+  m_EditorClassIdentifier: Assembly-CSharp::ProtocolTest
 --- !u!1 &985963075
 GameObject:
   m_ObjectHideFlags: 0
@@ -2774,7 +2771,9 @@ GameObject:
   - component: {fileID: 1541853458}
   - component: {fileID: 1541853456}
   - component: {fileID: 1541853455}
+  - component: {fileID: 1541853459}
   - component: {fileID: 1541853457}
+  - component: {fileID: 1541853460}
   m_Layer: 0
   m_Name: Sensors
   m_TagString: Untagged
@@ -2970,6 +2969,7 @@ MonoBehaviour:
   outputFolder: testing/recordings
   sceneName: dev
   stopAfterSeconds: 21
+  persistData: 0
 --- !u!114 &1541853458
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2988,6 +2988,41 @@ MonoBehaviour:
   outputFolder: testing/ground_truth
   runName: 
   logEveryNSteps: 1
+  persistData: 0
+--- !u!114 &1541853459
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541853446}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 68e44df5f72113b4ab98add5fe968452, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OracleFeed
+  oracleMode: 0
+  lidar: {fileID: 1541853450}
+  pose: {fileID: 1541853452}
+--- !u!114 &1541853460
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541853446}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16d542c6092cf7c478a02349529c1f7c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkHost
+  lidar: {fileID: 1541853450}
+  cameraSensor: {fileID: 1541853451}
+  pose: {fileID: 1541853452}
+  calibration: {fileID: 1541853453}
+  executor: {fileID: 935829884}
+  oracle: {fileID: 0}
+  waitForProcessor: 0
 --- !u!1 &1580507178
 GameObject:
   m_ObjectHideFlags: 0
@@ -3640,7 +3675,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RouteRoadMesh
   routeFile: routes/dev_road.json
-  vehicle: {fileID: 1128943756}
   width: 7
   spacing: 1
 --- !u!64 &1800529835

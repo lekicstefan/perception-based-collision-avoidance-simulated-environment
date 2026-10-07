@@ -143,9 +143,11 @@ public static class Protocol
         return w.Buf;
     }
 
-    public static byte[] BuildHello(uint seq)
+    public static byte[] BuildHello(uint seq, string runDir = null)
     {
-        return BuildJson(MsgType.Hello, seq, "{\"schema\":" + Version.ToString(CultureInfo.InvariantCulture) + "}");
+        string json = "{\"schema\":" + Version.ToString(CultureInfo.InvariantCulture);
+        if (runDir != null) json += ",\"run_dir\":\"" + runDir.Replace('\\', '/').Replace("\"", "\\\"") + "\"";
+        return BuildJson(MsgType.Hello, seq, json + "}");
     }
 
     public static byte[] BuildCalibration(uint seq, string calibrationJson)
