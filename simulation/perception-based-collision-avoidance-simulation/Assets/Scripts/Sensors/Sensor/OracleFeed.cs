@@ -15,6 +15,7 @@ public class OracleObject
 public class OracleFrame
 {
     public double timestamp;      // the LiDAR scan time it belongs to
+    public PoseState pose;        // pose stamped on the LiDAR scan it belongs to
     public OracleObject[] objects;
 }
 
@@ -64,14 +65,14 @@ public class OracleFeed : MonoBehaviour
                 height = h.Height
             });
         }
-        Last = new OracleFrame { timestamp = scan.timestamp, objects = list.ToArray() };
+
+        Last = new OracleFrame { timestamp = scan.timestamp, pose = scan.pose, objects = list.ToArray() };
 
         if (scan.frameId < 3 || scan.frameId % 50 == 0)
         {
             var s = new System.Text.StringBuilder("ORACLE t=" + scan.timestamp.ToString("F3") + " | " + Last.objects.Length + " objects:");
             foreach (OracleObject o in Last.objects)
-                s.Append(" #" + o.id + " (" + o.x.ToString("F2") + ", " + o.y.ToString("F2") + ", " + o.z.ToString("F2") + ") v(" +
-                         o.vx.ToString("F2") + ", " + o.vy.ToString("F2") + ") yaw " + (o.yaw * 180.0 / System.Math.PI).ToString("F1") + " |");
+                s.Append(" #" + o.id + " (" + o.x.ToString("F2") + ", " + o.y.ToString("F2") + ", " + o.z.ToString("F2") + ") v(" + o.vx.ToString("F2") + ", " + o.vy.ToString("F2") + ") yaw " + (o.yaw * 180.0 / System.Math.PI).ToString("F1") + " |");
             UnityEngine.Debug.Log(s.ToString());
         }
         if (OracleReady != null) OracleReady(Last);
