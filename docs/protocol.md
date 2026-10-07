@@ -55,7 +55,7 @@ Every message on the session, lidar, camera, pose and oracle sockets starts with
 | 80 | 4 | float32 | steering_angle | rad, positive left |
 | 84 | 4 | uint32 | reserved | 0 (keeps the payload 8-byte aligned) |
 
-Python: `struct.Struct("<4sHBBIId6d3fI")` (size 88). A receiver must check magic, version and `len(message) == 88 + payload_length`, and drop the message with a logged error otherwise. On the session socket the pose fields of HELLO, CALIBRATION and END_OF_RUN are zero.
+Python: `struct.Struct("<4sHBBIId6d3fI")` (size 88). A receiver must check magic, version and `len(message) == 88 + payload_length`, and drop the message with a logged error otherwise. On the session socket, t and the pose fields of HELLO, CALIBRATION and END_OF_RUN are zero.
 
 ## 4. Unity-to-Python message types
 
