@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-import protocol as P
+import testing.protocol.protocol as P
 
 POSE_VECTOR = bytes.fromhex(
     "41565053010006000700000000000000000000000000f83f0000000000802440000000000000e0bf"
