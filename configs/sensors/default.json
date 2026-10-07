@@ -10,7 +10,7 @@
     "horizontalFovDeg": 90.0,
     "mount": { "x": 1.8, "y": 0.0, "z": 1.3, "yawDeg": 0.0, "pitchDeg": 0.0, "rollDeg": 0.0 },
     "format": "jpeg",
-    "jpegQuality": 85,
+    "jpegQuality": 92,
     "postProcessing": {
       "noiseEnabled": false,
       "noiseStd": 3.0,

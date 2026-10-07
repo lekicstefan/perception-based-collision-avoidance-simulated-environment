@@ -18,7 +18,7 @@ Unity-to-Python data is split over several PUB sockets, one per stream, so that 
 
 - The **oracle socket exists only in oracle mode.** In normal mode Unity never binds port 5560 and Python never connects to it. The information-boundary test relies on this.
 - HWM values are initial. Set the send HWM on the Unity PUB socket **and** the receive HWM on the Python SUB socket to the same value, because the effective queue is the sum of both sides plus kernel buffers.
-- A PUB socket that reaches its HWM drops **new** messages, not old ones. A stalled processor therefore sees stale data first, then a gap. The gap is detected through the per-stream sequence number and counted in the run log.
+- A PUB socket at its HWM drops the newest messages and keeps the oldest. With default kernel buffers, megabytes queue up in TCP first, so a stalled processor would receive seconds of stale data. The sensor sockets therefore also set SNDBUF (Unity) and RCVBUF (Python) to 64 kB. With that setting the camera starts losing frames after a stall of about 1 s and LiDAR after about 2 s, and pose is never lost. After a longer stall the processor sees a bounded amount of stale data followed by a gap, detected through seq.
 - `ZMQ_CONFLATE` is deliberately not used on the sensor streams: the tracker needs every measurement, and Python drains the queues only once per cycle.
 - Subscribers subscribe to everything (empty prefix). The first byte(s) of a message are therefore the magic number, not a topic.
 
