@@ -10,9 +10,11 @@ public class GroundTruthLogger : MonoBehaviour
     public Vehicle vehicle;
     public PoseEstimator pose;
     public LidarSensor lidar;
-    public string outputFolder = "experiments/phase3/groundtruth";   // relative to the repository root
+    public string outputFolder = "testing/groundtruth";   // relative to the repository root
     public string runName = "";           // empty = date and time
     public int logEveryNSteps = 1;        // 1 = every physics step
+    public bool useRunFolder = true;
+    public bool persistData = false;
 
     StreamWriter ego, haz, vis, info;
     readonly HashSet<int> infoWritten = new HashSet<int>();
@@ -24,10 +26,18 @@ public class GroundTruthLogger : MonoBehaviour
 
     void Start()
     {
-        string root = Directory.GetParent(ConfigPaths.ConfigDir()).FullName;
-        string name = string.IsNullOrEmpty(runName) ? System.DateTime.Now.ToString("yyyyMMdd_HHmmss") : runName;
-        string folder = Path.Combine(root, outputFolder, name);
+        if (!persistData) return;
+
+        string folder;
+        if (useRunFolder) folder = RunFolder.UnityDir;
+        else
+        {
+            string root = Directory.GetParent(ConfigPaths.ConfigDir()).FullName;
+            string name = string.IsNullOrEmpty(runName) ? System.DateTime.Now.ToString("yyyyMMdd_HHmmss") : runName;
+            folder = Path.Combine(root, outputFolder, name);
+        }
         Directory.CreateDirectory(folder);
+
         ego = new StreamWriter(Path.Combine(folder, "ego.csv"));
         ego.WriteLine("t,x,y,z,yaw_rad,pitch_rad,speed,yaw_rate,steering,accel,jerk,requested_accel");
         haz = new StreamWriter(Path.Combine(folder, "hazards.csv"));

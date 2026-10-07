@@ -14,9 +14,10 @@ public class DevRecorder : MonoBehaviour
     public PoseEstimator pose;
     public CalibrationProvider calibration;
     public GroundTruthLogger groundTruth;
-    public string outputFolder = "experiments/phase3/recordings";   // relative to the repository root
+    public string outputFolder = "testing/recordings";   // relative to the repository root
     public string sceneName = "dev";
     public float stopAfterSeconds = 21f;     // simulation time; 0 = never
+    public bool persistData = false;
 
     string folder;
     bool started, closed, warnedRaw;
@@ -30,6 +31,8 @@ public class DevRecorder : MonoBehaviour
 
     void Awake()
     {
+        if (!persistData) return;
+
         string root = Directory.GetParent(ConfigPaths.ConfigDir()).FullName;
         string name = sceneName + "_" + rig.Config.name + "_seed" + rig.Seed;
         string path = Path.Combine(root, outputFolder, name);
@@ -38,6 +41,7 @@ public class DevRecorder : MonoBehaviour
         folder = path;
         if (groundTruth != null)     // the ground truth goes into the same folder
         {
+            groundTruth.useRunFolder = false;
             groundTruth.outputFolder = outputFolder;
             groundTruth.runName = Path.GetFileName(folder);
         }

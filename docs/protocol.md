@@ -106,7 +106,7 @@ Record (64 bytes): `int32 id`, `float64 x, y, z, yaw, vx, vy` (m, rad, m/s, star
 
 ### 4.4 Session messages (JSON payloads)
 
-- **HELLO:** `{"schema": 1}`. Sent by Unity every 100 ms from start-up until READY is received.
+- **HELLO:** `{"schema": 1, "run_dir": "<absolute path of the run folder, forward slashes>"}`. Sent by Unity every 100 ms from start-up until READY is received. The processor writes its logs into <run_dir>/python/ and never uses the path for anything else.
 - **CALIBRATION:** the `CalibrationData` JSON built by `CalibrationBuilder` (compact form, `CalibrationProvider.Json`), which contains `calibrationId`, the content hash. Sent once right after READY and then every 1 s. A receiver ignores a repeat with the same id. A changed id during a run is an error. It contains no noise, dropout, fog or seed parameters.
 - **END_OF_RUN:** `{"sim_time": <float>}`. Nothing else: the reason for the end (collision, route finished, ...) stays in Unity's own log. Sent 5 times, 100 ms apart, followed by a socket linger of 500 ms, so the loss of one copy cannot hide it. Receivers deduplicate.
 

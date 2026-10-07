@@ -53,6 +53,7 @@ public class NetworkHost : MonoBehaviour
     uint lidarSeq, cameraSeq, poseSeq, oracleSeq;   // main thread only
     readonly long[] sentCount = new long[5];        // network thread writes, read after Join
     int commandsReceived, parseErrors, queueDrops;
+    string runDir;
 
     public bool Started { get { return started; } }
     public string LatestTelemetry { get { return latestTelemetry; } }   // JSON for the dashboard (step 7.14)
@@ -94,6 +95,7 @@ public class NetworkHost : MonoBehaviour
         if (calibration == null) UnityEngine.Debug.LogWarning("NetworkHost: no CalibrationProvider assigned, the processor will never get a calibration.");
         executorRef = executor;
         bool oracleMode = oracle != null && oracle.oracleMode;
+        runDir = RunFolder.Dir;
         threadAlive = true;
         thread = new Thread(() => NetLoop(oracleMode)) { IsBackground = true, Name = "NetworkHost" };
         thread.Start();
@@ -194,7 +196,7 @@ public class NetworkHost : MonoBehaviour
                 if (now - lastHello >= 100)
                 {
                     lastHello = now;
-                    pubs[SSession].SendFrame(Protocol.BuildHello(helloSeq++));
+                    pubs[SSession].SendFrame(Protocol.BuildHello(helloSeq++, runDir));
                 }
             }
             else
