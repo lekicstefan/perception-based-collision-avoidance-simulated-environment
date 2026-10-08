@@ -171,7 +171,7 @@ A run is one Unity process plus one Python process. If either dies, the run is i
 
 Allowed to reach Python in normal mode: the message types HELLO, CALIBRATION, END_OF_RUN, LIDAR, CAMERA, POSE, with exactly the fields in sections 3 and 4.
 Never sent: object lists, true object poses or velocities, scene layout, semantic labels, ground-truth hit ids, the noise-free pose when pose noise is on, simulator internals (noise, dropout, fog or seed parameters, `latencyMs`). ORACLE messages exist only on port 5560 in oracle mode.
-The automated test checks: (a) port 5560 is not bound in normal mode, (b) every message type seen is in the allowed list, (c) every message parses with exactly the layouts above, (d) the calibration JSON contains none of the forbidden keys.
+The automated test is `server/test_boundary.py`. `python server/boundary.py runs/<id> [--ports]` audits a recorded run, and `run_processor.py` runs the same check at the end of every recorded run (result in `python/summary.json`, key `boundary`). Calibration keys are checked against an allow-list and a list of forbidden words.
 
 ## 8. Test vectors
 

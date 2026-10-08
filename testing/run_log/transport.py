@@ -106,6 +106,8 @@ class Link:
         self.error_count = 0
         self._pending: list[Incoming] = []
         self._last_session = time.monotonic()
+        self.recorder = None                 # StreamRecorder, see attach_recorder()
+        self._rec_buffer: list | None = None # (arrival time, raw) kept during the handshake, before the run folder is known
 
     # ------------------------------------------------------------------ receiving
 
@@ -124,11 +126,13 @@ class Link:
             cid = data.get("calibrationId")
             if self.calibration is None:
                 self.calibration, self.calibration_id = data, cid
+                self._record(raw)
             elif cid != self.calibration_id:
                 raise P.ProtocolError(f"calibration id changed during the run ({self.calibration_id} -> {cid})")
         elif h.type == P.MsgType.END_OF_RUN and not self.ended:   # Unity sends several copies
             self.ended = True
             self.end_sim_time = data.get("sim_time")
+            self._record(raw)
 
     def _receive(self, timeout_ms: int) -> list[Incoming]:
         out: list[Incoming] = []
@@ -154,8 +158,25 @@ class Link:
                     self._error(name, e)
                     continue
                 self.stats[name].update(h.seq, h.t)
+                self._record(raw)
                 out.append(Incoming(h, raw))
         return out
+
+    def _record(self, raw: bytes) -> None:
+        if self.recorder is not None:
+            self.recorder.write(raw)
+        elif self._rec_buffer is not None:
+            self._rec_buffer.append((time.monotonic(), raw))
+
+    def attach_recorder(self, recorder) -> None:
+        """Start recording. Messages that arrived during the handshake (buffer_for_recording=True) are written first."""
+        for arrival, raw in self._rec_buffer or []:
+            recorder.write(raw, arrival)
+        self._rec_buffer = None
+        self.recorder = recorder
+
+    def stop_buffering(self) -> None:
+        self._rec_buffer = None
 
     def drain(self, timeout_ms: int = 0) -> list[Incoming]:
         """Everything that arrived since the last call (sensor messages only), in arrival order per stream."""
@@ -171,8 +192,12 @@ class Link:
     # ------------------------------------------------------------------ handshake and sending
 
     def handshake(self, warmup=None, timeout: float = 120.0, settle: float = 0.3, ready_period: float = 0.1,
-                  data_timeout: float = 10.0) -> None:
-        """Warm up, wait for HELLO, settle, then send READY until the first POSE message arrives."""
+                  data_timeout: float = 10.0, buffer_for_recording: bool = False) -> None:
+        """Warm up, wait for HELLO, settle, then send READY until the first POSE message arrives.
+
+        buffer_for_recording: keep what arrives during the handshake so attach_recorder() can write it afterwards."""
+        if buffer_for_recording:
+            self._rec_buffer = []
         if warmup is not None:
             warmup()                                # Numba compilation etc. before Unity is told to start
         t0 = time.monotonic()

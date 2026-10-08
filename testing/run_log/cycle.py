@@ -32,11 +32,12 @@ class Processor:
 
 
 class CycleRunner:
-    def __init__(self, link: Link, processor: Processor, rate_hz: float = 30.0, run_log=None):
+    def __init__(self, link: Link, processor: Processor, rate_hz: float = 30.0, run_log=None, realtime: bool = True):
         self.link = link
         self.processor = processor
         self.period = 1.0 / rate_hz
         self.rate_hz = rate_hz
+        self.realtime = realtime             # False: replay as fast as possible, no waiting between cycles
         self.drain_ms: list[float] = []      # receive and parse
         self.process_ms: list[float] = []    # processor.step
         self.total_ms: list[float] = []      # whole cycle including sending
@@ -55,9 +56,10 @@ class CycleRunner:
         while not link.ended:
             if max_seconds is not None and time.perf_counter() - t_begin > max_seconds:
                 break
-            wait = next_tick - time.perf_counter()
-            if wait > 0:
-                time.sleep(wait)
+            if self.realtime:
+                wait = next_tick - time.perf_counter()
+                if wait > 0:
+                    time.sleep(wait)
 
             t0 = time.perf_counter()
             link.check_alive()
@@ -95,9 +97,10 @@ class CycleRunner:
                     self.command_table.row(cycle, round(t0 - t_begin, 6), *dataclasses.astuple(cmd))
             cycle += 1
 
-            next_tick += self.period
-            if next_tick < t3:               # late: no catch-up burst
-                next_tick = t3
+            if self.realtime:
+                next_tick += self.period
+                if next_tick < t3:           # late: no catch-up burst
+                    next_tick = t3
         self.duration = time.perf_counter() - t_begin
 
     def stats(self) -> dict:
