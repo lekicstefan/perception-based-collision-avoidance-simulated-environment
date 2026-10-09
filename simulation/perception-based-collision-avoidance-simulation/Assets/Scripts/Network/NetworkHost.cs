@@ -4,6 +4,7 @@ using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
 using UnityEngine;
+using Newtonsoft.Json.Linq;
 using Stopwatch = System.Diagnostics.Stopwatch;
 
 // Unity side of docs/protocol.md: sockets, handshake, heartbeat and shutdown.
@@ -46,6 +47,7 @@ public class NetworkHost : MonoBehaviour
     volatile bool endRequested;
     volatile string calibrationJson;
     volatile string latestTelemetry;
+    volatile string readyJson;
     double endSimTime;
     CommandExecutor executorRef;                // read on the network thread, compared with ReferenceEquals (no Unity calls)
 
@@ -53,7 +55,6 @@ public class NetworkHost : MonoBehaviour
     uint lidarSeq, cameraSeq, poseSeq, oracleSeq;   // main thread only
     readonly long[] sentCount = new long[5];        // network thread writes, read after Join
     int commandsReceived, parseErrors, queueDrops;
-    string runDir;
 
     public bool Started { get { return started; } }
     public string LatestTelemetry { get { return latestTelemetry; } }   // JSON for the dashboard (step 7.14)
@@ -61,7 +62,12 @@ public class NetworkHost : MonoBehaviour
     // Called by whoever ends the run (the scenario manager in phase 8). Sends END_OF_RUN to the processor.
     public void RequestEndOfRun(double simTime)
     {
-        if (!started || endRequested) return;
+        if (!started || endRequested)
+        {
+            RunFolder.Configure(null);
+            return;
+        }
+
         endSimTime = simTime;
         endRequested = true;
     }
@@ -95,7 +101,6 @@ public class NetworkHost : MonoBehaviour
         if (calibration == null) UnityEngine.Debug.LogWarning("NetworkHost: no CalibrationProvider assigned, the processor will never get a calibration.");
         executorRef = executor;
         bool oracleMode = oracle != null && oracle.oracleMode;
-        runDir = RunFolder.Dir;
         threadAlive = true;
         thread = new Thread(() => NetLoop(oracleMode)) { IsBackground = true, Name = "NetworkHost" };
         thread.Start();
@@ -114,6 +119,10 @@ public class NetworkHost : MonoBehaviour
 
         if (!started && readyReceived)
         {
+            string path = null;
+            if (!string.IsNullOrEmpty(readyJson)) path = (string)JObject.Parse(readyJson)["run_dir"];
+            RunFolder.Configure(path);
+
             started = true;
             Time.timeScale = 1f;
             UnityEngine.Debug.Log("NetworkHost: READY received, the run starts now");
@@ -196,7 +205,7 @@ public class NetworkHost : MonoBehaviour
                 if (now - lastHello >= 100)
                 {
                     lastHello = now;
-                    pubs[SSession].SendFrame(Protocol.BuildHello(helloSeq++, runDir));
+                    pubs[SSession].SendFrame(Protocol.BuildHello(helloSeq++));
                 }
             }
             else
@@ -250,6 +259,7 @@ public class NetworkHost : MonoBehaviour
         switch (type)
         {
             case Protocol.CmdType.Ready:
+                readyJson = json;
                 readyReceived = true;
                 break;
             case Protocol.CmdType.Command:

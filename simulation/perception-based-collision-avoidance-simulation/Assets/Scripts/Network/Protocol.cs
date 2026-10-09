@@ -201,7 +201,7 @@ public static class Protocol
         switch (type)
         {
             case CmdType.Ready:
-                if (length != 0) { error = "READY has no payload"; return false; }
+                if (length > 0) json = Encoding.UTF8.GetString(msg, CommandHeaderSize, (int)length);
                 return true;
 
             case CmdType.Command:

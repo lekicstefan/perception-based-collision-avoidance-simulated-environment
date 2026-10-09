@@ -262,7 +262,7 @@ public class CameraSensor : MonoBehaviour
     void SaveSample()
     {
         if (LastFrame == null || LastFrame.format != "jpeg") { UnityEngine.Debug.LogWarning("No JPEG frame yet"); return; }
-        string dir = System.IO.Path.Combine(System.IO.Directory.GetParent(ConfigPaths.ConfigDir()).FullName, "testing", "camera testing");
+        string dir = System.IO.Path.Combine(System.IO.Directory.GetParent(ConfigPaths.ConfigDir()).FullName, "testing", "data", "camera");
         System.IO.Directory.CreateDirectory(dir);
         string path = System.IO.Path.Combine(dir, "camera_sample.jpg");
         System.IO.File.WriteAllBytes(path, LastFrame.data);

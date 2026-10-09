@@ -1248,7 +1248,7 @@ MonoBehaviour:
   - 90
   - 100
   settleTime: 1
-  outputFolder: testing/braking testing
+  outputFolder: testing/tools/braking
 --- !u!114 &935829888
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2773,8 +2773,8 @@ GameObject:
   - component: {fileID: 1541853455}
   - component: {fileID: 1541853459}
   - component: {fileID: 1541853457}
-  - component: {fileID: 1541853460}
   - component: {fileID: 1541853461}
+  - component: {fileID: 1541853460}
   m_Layer: 0
   m_Name: Sensors
   m_TagString: Untagged
@@ -2967,7 +2967,7 @@ MonoBehaviour:
   pose: {fileID: 1541853452}
   calibration: {fileID: 1541853453}
   groundTruth: {fileID: 1541853458}
-  outputFolder: testing/recordings
+  outputFolder: testing/data/recordings
   sceneName: dev
   stopAfterSeconds: 21
   persistData: 0
@@ -2986,7 +2986,7 @@ MonoBehaviour:
   vehicle: {fileID: 1128943756}
   pose: {fileID: 1541853452}
   lidar: {fileID: 1541853450}
-  outputFolder: testing/ground_truth
+  outputFolder: testing/data/ground_truth
   runName: 
   logEveryNSteps: 1
   useRunFolder: 1
