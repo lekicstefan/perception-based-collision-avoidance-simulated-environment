@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from server.perception.ground import GroundConfig, GroundMethod, GroundRemover
-from testing.support.beta_clusters import cluster_labels
+from server.perception.segmentation import beta_labels
 from testing.support.synthetic_scene import Scene, make_lidar
 from testing.support.paths import RECORDINGS_DIR
 
@@ -115,7 +115,7 @@ def test_there_is_no_way_to_switch_ground_removal_off():
 
 
 def _clusters(img, geo, truth, use):
-    labels = cluster_labels(np.nan_to_num(img.range_m), geo.alpha_h, geo.alpha_v, use)
+    labels = beta_labels(img.range_m, geo.alpha_h, geo.alpha_v, use)
     ids, sizes = np.unique(labels[labels >= 0], return_counts=True)
     return labels, ids, sizes
 
