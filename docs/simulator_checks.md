@@ -41,8 +41,8 @@ Expected impact speed v = √(2a(d_stop − gap)) with d_stop = 14.35 m. The rec
 
 Full emergency braking through the command executor from steady speed, distance measured from the step the command is submitted.
 
-Data: `testing/braking testing/stopping_table.csv`.
-Fit: `testing/braking testing/stopping_fit.json`, `testing/braking testing/stopping_fit.png`.
+Data: `testing/tools/braking/stopping_table.csv`.
+Fit: `testing/tools/braking/stopping_fit.json`, `testing/tools/braking/stopping_fit.png`.
 
 | Speed | Expected distance | Expected time | Measured distance | Measured time |
 |---|---|---|---|---|

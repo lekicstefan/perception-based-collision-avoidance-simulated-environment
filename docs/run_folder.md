@@ -1,6 +1,6 @@
 # Run folder
 
-Every run writes into one folder, `runs/<run id>/` (not committed, listed in `.gitignore`). Unity creates it (run id = date and time, or `--run-id`; root = `runs/` next to `configs/`, or `--runs-root`) and sends its absolute path to the processor in the HELLO message (`run_dir`). The processor only uses it to know where to write its logs and never parses it for anything else.
+Every run writes into one folder, `runs/<run id>/` (not committed, listed in `.gitignore`). Unity creates it (run id = date and time, or `--run-id`; root = `runs/` next to `configs/`, or `--runs-root`) and sends its absolute path to the processor in the HELLO message (`run_dir`). The processor only uses it to know where to write its logs and never parses it for anything else. The processor creates the folder name (--run-dir [name], root runs/) and sends the path to Unity in READY. Without --run-dir no run folder exists.
 
 ```
 runs/<run id>/

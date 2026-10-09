@@ -14,9 +14,9 @@ public class DevRecorder : MonoBehaviour
     public PoseEstimator pose;
     public CalibrationProvider calibration;
     public GroundTruthLogger groundTruth;
-    public string outputFolder = "testing/recordings";   // relative to the repository root
+    public string outputFolder = "testing/data/recordings"; // relative to the repository root
     public string sceneName = "dev";
-    public float stopAfterSeconds = 21f;     // simulation time; 0 = never
+    public float stopAfterSeconds = 21f;    // simulation time; 0 = never
     public bool persistData = false;
 
     string folder;
@@ -39,7 +39,7 @@ public class DevRecorder : MonoBehaviour
         int suffix = 2;
         while (Directory.Exists(path)) path = Path.Combine(root, outputFolder, name + "_" + suffix++);
         folder = path;
-        if (groundTruth != null)     // the ground truth goes into the same folder
+        if (groundTruth != null)    // the ground truth goes into the same folder
         {
             groundTruth.useRunFolder = false;
             groundTruth.outputFolder = outputFolder;
@@ -63,7 +63,7 @@ public class DevRecorder : MonoBehaviour
 
     void EnsureStarted()
     {
-        if (started) return;
+        if (started || !persistData) return;
         started = true;
         Directory.CreateDirectory(Path.Combine(folder, "camera"));
         LidarConfig lc = rig.Config.lidar;
@@ -106,7 +106,7 @@ public class DevRecorder : MonoBehaviour
 
     void OnScan(LidarScan s)
     {
-        if (closed) return;
+        if (closed || !persistData) return;
         EnsureStarted();
         BinaryWriter w = lidarWriter;
         w.Write(s.frameId);
@@ -122,7 +122,7 @@ public class DevRecorder : MonoBehaviour
 
     void OnFrame(CameraFrame f)
     {
-        if (closed) return;
+        if (closed || !persistData) return;
         EnsureStarted();
         if (f.format != "jpeg")
         {
@@ -136,7 +136,7 @@ public class DevRecorder : MonoBehaviour
 
     void OnPose(PoseState p)
     {
-        if (closed) return;
+        if (closed || !persistData) return;
         EnsureStarted();
         poseCsv.WriteLine(R(p.timestamp) + "," + PoseColumns(p));
         nPose++;

@@ -1039,7 +1039,7 @@ MonoBehaviour:
   - 90
   - 100
   settleTime: 1
-  outputFolder: testing/braking testing
+  outputFolder: testing/tools/braking
 --- !u!114 &935829888
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1123,9 +1123,11 @@ MonoBehaviour:
   vehicle: {fileID: 1128943756}
   pose: {fileID: 1541853452}
   lidar: {fileID: 1541853450}
-  outputFolder: testing/ground_truth
+  outputFolder: testing/data/ground_truth
   runName: 
   logEveryNSteps: 1
+  useRunFolder: 1
+  persistData: 0
 --- !u!1 &985963075
 GameObject:
   m_ObjectHideFlags: 0
@@ -3562,7 +3564,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cfe3069b4ed1f934faaef21f6e1e909d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RouteRoadMesh
-  vehicle: {fileID: 1128943756}
+  routeFile: routes/dev_road.json
   width: 7
   spacing: 1
 --- !u!64 &1800529835

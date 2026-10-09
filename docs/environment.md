@@ -18,7 +18,7 @@
 |---|---|
 | Python version | 3.13.7 |
 | Virtual environment | `.venv/` |
-| Dependency lock file | `server/requirements.txt` |
+| Dependency lock file | `server/requirements.txt` (server runtime) and `testing/requirements.txt` (development environment, superset of the first) |
 
 Core libraries: numpy, scipy, opencv-python, pyzmq, numba, pytest, pandas, pyarrow, matplotlib.
 

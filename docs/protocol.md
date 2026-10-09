@@ -106,7 +106,7 @@ Record (64 bytes): `int32 id`, `float64 x, y, z, yaw, vx, vy` (m, rad, m/s, star
 
 ### 4.4 Session messages (JSON payloads)
 
-- **HELLO:** `{"schema": 1, "run_dir": "<absolute path of the run folder, forward slashes>"}`. Sent by Unity every 100 ms from start-up until READY is received. The processor writes its logs into <run_dir>/python/ and never uses the path for anything else.
+- **HELLO:** `{"schema": 1}`. Sent by Unity every 100 ms from start-up until READY is received. The processor writes its logs into <run_dir>/python/ and never uses the path for anything else.
 - **CALIBRATION:** the `CalibrationData` JSON built by `CalibrationBuilder` (compact form, `CalibrationProvider.Json`), which contains `calibrationId`, the content hash. Sent once right after READY and then every 1 s. A receiver ignores a repeat with the same id. A changed id during a run is an error. It contains no noise, dropout, fog or seed parameters.
 - **END_OF_RUN:** `{"sim_time": <float>}`. Nothing else: the reason for the end (collision, route finished, ...) stays in Unity's own log. Sent 5 times, 100 ms apart, followed by a socket linger of 500 ms, so the loss of one copy cannot hide it. Receivers deduplicate.
 
@@ -128,7 +128,7 @@ Python: `struct.Struct("<4sHBBI")` (size 12).
 
 ### 5.1 READY (type 1)
 
-No payload. Sent only after Python has finished its warm-up and connected all of its SUB sockets. Resent every 100 ms until the first POSE message arrives.
+Optional JSON payload `{"run_dir": "<absolute path>"}`. It is present only when the processor was started with --run-dir. It is the one addition to a message layout that keeps schema version 1, since nothing is released yet.
 
 ### 5.2 COMMAND (type 2), payload 44 bytes (message 56 bytes)
 
@@ -171,7 +171,7 @@ A run is one Unity process plus one Python process. If either dies, the run is i
 
 Allowed to reach Python in normal mode: the message types HELLO, CALIBRATION, END_OF_RUN, LIDAR, CAMERA, POSE, with exactly the fields in sections 3 and 4.
 Never sent: object lists, true object poses or velocities, scene layout, semantic labels, ground-truth hit ids, the noise-free pose when pose noise is on, simulator internals (noise, dropout, fog or seed parameters, `latencyMs`). ORACLE messages exist only on port 5560 in oracle mode.
-The automated test is `server/test_boundary.py`. `python server/boundary.py runs/<id> [--ports]` audits a recorded run, and `run_processor.py` runs the same check at the end of every recorded run (result in `python/summary.json`, key `boundary`). Calibration keys are checked against an allow-list and a list of forbidden words.
+The automated test is `testing/tests/server/communication/test_boundary.py`. `python -m server.communication.boundary runs/<id> [--ports]` audits a recorded run, and `run_processor.py` runs the same check at the end of every recorded run (result in `python/summary.json`, key `boundary`). Calibration keys are checked against an allow-list and a list of forbidden words.
 
 ## 8. Test vectors
 
@@ -200,4 +200,4 @@ Both implementations must reproduce these bytes exactly (unit test on each side)
 Proposed, matching the current repository layout:
 
 - Unity: `Assets/Scripts/Network/Protocol.cs` (constants, header writer), one network thread, one thread-safe queue per outgoing socket.
-- Python: `server/protocol.py` (constants, header and payload parsers, command builder), with pytest tests that check the test vectors in section 8.
+- Python: `server/communication/protocol.py` (constants, header and payload parsers, command builder), with pytest tests that check the test vectors in section 8.

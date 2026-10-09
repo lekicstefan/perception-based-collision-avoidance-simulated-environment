@@ -10,7 +10,7 @@ public class GroundTruthLogger : MonoBehaviour
     public Vehicle vehicle;
     public PoseEstimator pose;
     public LidarSensor lidar;
-    public string outputFolder = "testing/groundtruth";   // relative to the repository root
+    public string outputFolder = "testing/data/ground_truth";   // relative to the repository root
     public string runName = "";           // empty = date and time
     public int logEveryNSteps = 1;        // 1 = every physics step
     public bool useRunFolder = true;
@@ -21,11 +21,24 @@ public class GroundTruthLogger : MonoBehaviour
     long step;
     double nextFlush;
     bool closed;
+    bool opened;
     static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
     static string F(double v) { return v.ToString("F4", Inv); }
 
-    void Start()
+    void Start() { if (!useRunFolder) Open(); }
+
+    void Update()
     {
+        if (opened || !useRunFolder) return;
+        if (RunFolder.Current == RunFolder.State.Unknown) return;
+        if (RunFolder.Current == RunFolder.State.Disabled) { enabled = false; return; }
+        Open();
+    }
+
+    void Open()
+    {
+        opened = true;
+
         if (!persistData) return;
 
         string folder;
@@ -53,7 +66,7 @@ public class GroundTruthLogger : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (closed || !pose.HasOrigin) return;
+        if (!persistData || closed || !opened || pose == null || !pose.HasOrigin) return;
         step++;
         if (step % Mathf.Max(1, logEveryNSteps) != 0) return;
 
@@ -83,7 +96,7 @@ public class GroundTruthLogger : MonoBehaviour
     // called at every LiDAR scan: how many cells hit each hazard, and where the hazard is relative to the sensor
     void OnScan(LidarScan scan)
     {
-        if (closed || !pose.HasOrigin) return;
+        if (closed || !opened || !pose.HasOrigin) return;
         List<Hazard> list = Hazard.All;
         var map = new Dictionary<int, int>();      // collider id -> index in the hazard list
         for (int k = 0; k < list.Count; k++)
@@ -120,15 +133,19 @@ public class GroundTruthLogger : MonoBehaviour
 
     public void Flush()
     {
-        if (closed) return;
-        ego.Flush(); haz.Flush(); vis.Flush(); info.Flush();
+        if (closed || !opened) return;
+
+        ego?.Flush(); haz?.Flush(); vis?.Flush(); info?.Flush();
     }
 
     void Close()
     {
         if (closed) return;
         closed = true;
-        ego.Dispose(); haz.Dispose(); vis.Dispose(); info.Dispose();
+        if (!opened) return;
+
+        ego?.Dispose(); haz?.Dispose(); vis?.Dispose(); info?.Dispose();
+        ego = null; haz = null; vis = null; info = null;
     }
 
     void OnApplicationQuit() { Close(); }

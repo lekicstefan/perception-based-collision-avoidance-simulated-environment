@@ -81,7 +81,7 @@ public class CalibrationTest : MonoBehaviour
         CalibrationData c = CalibrationBuilder.Build(cfg, vehicle, egoBox);
         string text = CalibrationBuilder.ToJson(c, true);
         string root = System.IO.Directory.GetParent(ConfigPaths.ConfigDir()).FullName;
-        string dir = System.IO.Path.Combine(root, "testing", "sensor_calibration", "results");
+        string dir = System.IO.Path.Combine(root, "testing", "data", "calibration");
         System.IO.Directory.CreateDirectory(dir);
         System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "recorded_data.json"), text);
         UnityEngine.Debug.Log("Saved calibration " + c.calibrationId + " to " + dir);

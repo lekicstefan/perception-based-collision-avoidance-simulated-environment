@@ -8,8 +8,8 @@ public class StoppingTableRunner : MonoBehaviour
     public Vehicle vehicle;
     public CommandExecutor executor;
     public float[] speedsKmh = { 20, 30, 40, 50, 60, 70, 80, 90, 100 };
-    public float settleTime = 1f;                       // s at steady speed before the command
-    public string outputFolder = "experiments/phase2";  // relative to the repository root
+    public float settleTime = 1f;                           // s at steady speed before the command
+    public string outputFolder = "testing/tools/braking";   // relative to the repository root
 
     enum Phase { Setup, Settle, Braking, Finished }
     Phase phase = Phase.Setup;
