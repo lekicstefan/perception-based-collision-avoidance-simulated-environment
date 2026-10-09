@@ -46,7 +46,7 @@ class GroundConfig:
     slope_tol_deg: float = 10.0      # RANGE_IMAGE: steepest slope still counted as ground
 
 
-def _level_frame(points: np.ndarray, pitch: float):
+def level_frame(points: np.ndarray, pitch: float):
     """Vehicle frame points -> (forward distance along the level plane, y, height above the ground plane)."""
     s, c = math.sin(pitch), math.cos(pitch)
     x, y, z = points[..., 0], points[..., 1], points[..., 2]
@@ -54,14 +54,14 @@ def _level_frame(points: np.ndarray, pitch: float):
 
 
 def height_filter_mask(img: RangeImage, geometry: LidarGeometry, height_tol_m: float = 0.15) -> np.ndarray:
-    _, _, h = _level_frame(geometry.points_vehicle(img), img.pose[4])
+    _, _, h = level_frame(geometry.points_vehicle(img), img.pose[4])
     with np.errstate(invalid="ignore"):
         return img.valid & (h < height_tol_m)
 
 
 def range_image_mask(img: RangeImage, geometry: LidarGeometry, slope_tol_deg: float = 10.0) -> np.ndarray:
     pitch = img.pose[4]
-    xl, y, h = _level_frame(geometry.points_vehicle(img), pitch)
+    xl, y, h = level_frame(geometry.points_vehicle(img), pitch)
     rows, cols = img.shape
     tan_tol = math.tan(math.radians(slope_tol_deg))
     # start of every column's chain: the ground point under the sensor
