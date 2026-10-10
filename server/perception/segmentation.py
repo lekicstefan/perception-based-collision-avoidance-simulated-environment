@@ -41,7 +41,15 @@ class SegmentationConfig:
     min_cells: int = 2
     split: bool = True               # secondary split test on/off (off only to show what it does)
     split_depth_step_m: float = 0.15
-    split_height_step_m: float = 0.25
+    split_height_step_m: float = 0.2
+    merge_caps: bool = True                    # join a flat strip on top of an object (its roof, seen from above) to it
+    cap_max_rows: int = 2
+    cap_wide_cells: int = 14                   # a strip this big and this wide (not a far person) may also overlap the top row
+    cap_wide_cols: int = 10
+    cap_max_ratio: float = 0.35                # the strip has at most this share of the object's cells
+    cap_depth_m: float = 6.0                   # and lies at most this far behind the object's nearest range
+    cap_height_tol_m: float = 0.15             # its height may exceed the object's top by at most this
+    split_height_beam_factor: float = 0.6      # a height step must also exceed this many times the largest gap between two beams
 
 
 @dataclass(frozen=True, eq=False)
@@ -105,6 +113,8 @@ class Segmenter:
         groups = self._groups(labels)
         if cfg.split:
             groups = [g for rows, cols in groups for g in self._split(rows, cols, rng, z)]
+        if cfg.merge_caps:
+            groups = self._merge_caps(groups, rng, z)
         out = np.full(img.shape, -1, dtype=np.int32)
         clusters, discarded = [], 0
         for rows, cols in groups:
@@ -127,6 +137,45 @@ class Segmenter:
         cuts = np.flatnonzero(np.diff(lab)) + 1
         return list(zip(np.split(r, cuts), np.split(c, cuts)))
 
+    def _merge_caps(self, groups, rng, z):
+        """A car seen from above has its roof in one or two rows that lie far behind its front (the beam grazes the roof),
+        so the angle test cuts them off. A strip of at most cap_max_rows rows right above a bigger group, inside its
+        columns, whose height matches the group's top and which is not too far behind it, is joined to that group.
+        A person's head behind a car is taller than the car's top and keeps its own cluster."""
+        cfg = self.config
+        info = [(rows, cols, rng[rows, cols], z[rows, cols]) for rows, cols in groups]
+        target = list(range(len(groups)))
+        for a, (ra, ca, da, za) in enumerate(info):
+            if np.ptp(ra) + 1 > cfg.cap_max_rows:
+                continue
+            wide = len(ra) >= cfg.cap_wide_cells and np.ptp(ca) + 1 >= cfg.cap_wide_cols
+            best = None
+            for b, (rb, cb, db, zb) in enumerate(info):
+                if b == a or len(ra) > cfg.cap_max_ratio * len(rb):
+                    continue
+                if wide:                                                                      # on top of it, may overlap its top row
+                    if not (ra.max() >= rb.min() - 2 and ra.min() <= rb.min() + 1):
+                        continue
+                elif not (rb.min() - 2 <= ra.max() < rb.min()):                               # small: entirely just above it
+                    continue
+                    continue
+                if (ca < cb.min() - 1).any() or (ca > cb.max() + 1).any():                  # inside its columns
+                    continue
+                near = float(np.nanmin(db))
+                if not (near - 0.5 <= float(np.nanmedian(da)) <= near + cfg.cap_depth_m):
+                    continue
+                if float(np.nanmax(za)) > float(np.nanmax(zb)) + cfg.cap_height_tol_m:
+                    continue
+                if best is None or len(rb) > len(info[best][0]):
+                    best = b
+            if best is not None:
+                target[a] = best
+        merged = {}
+        for k, (rows, cols) in enumerate(groups):
+            t = target[k]
+            merged.setdefault(t, []).append((rows, cols))
+        return [(np.concatenate([r for r, _ in v]), np.concatenate([c for _, c in v])) for v in merged.values()]
+
     def _split(self, rows, cols, rng, z):
         """Cut a cluster at steps in its depth or height profile. Returns a list of (rows, cols)."""
         cfg = self.config
@@ -145,7 +194,7 @@ class Segmenter:
         vcell = r_med * float(self.row_step[max(rows.min() - 1, 0):rows.max() + 1].max())   # largest gap between beams
         dd, dz = np.abs(np.diff(depth)), np.abs(np.diff(top))
         cut = adjacent & (self._is_step(dd, adjacent, cfg.split_depth_step_m) |
-                          self._is_step(dz, adjacent, max(cfg.split_height_step_m, 1.5 * vcell)))
+                          self._is_step(dz, adjacent, max(cfg.split_height_step_m, cfg.split_height_beam_factor * vcell)))
         if not cut.any():
             return [(rows, cols)]
         part = np.searchsorted(ucols[:-1][cut], cols, side="left")        # which side of each cut the column is on

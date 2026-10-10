@@ -4,7 +4,8 @@ World frame: x forward, z up. The vehicle origin (rear axle, ground level) is th
 by `pitch` (rad) about it. The terrain only depends on x: piecewise linear, given as [(x_start, slope), ...] with
 height 0 at x = 0. Boxes stand on the terrain at their centre.
 
-render() returns (RangeImage, truth) with truth 0 = no hit, 1 = ground, 2 = object.
+render() returns (RangeImage, truth, geometry) with truth 0 = no hit, 1 = ground, 2 = object; scene.last_box_index tells
+which box every cell hit.
 """
 from __future__ import annotations
 
@@ -78,9 +79,13 @@ class Scene:
         d = b.geometry.dirs_vehicle @ rot.T
         t_ground = self._terrain_hit(o, d)
         t_box = np.full_like(t_ground, np.inf)
-        for box in self.boxes:
-            t_box = np.minimum(t_box, self._box_hit(o, d, box))
+        self.last_box_index = np.full(t_ground.shape, -1, dtype=int)      # which box each cell hit (-1: none), for tests
+        for i, box in enumerate(self.boxes):
+            t_i = self._box_hit(o, d, box)
+            self.last_box_index = np.where(t_i < t_box, i, self.last_box_index)
+            t_box = np.minimum(t_box, t_i)
         t = np.minimum(t_ground, t_box)
+        self.last_box_index = np.where(t_box < t_ground, self.last_box_index, -1)
         truth = np.where(t > lidar.max_range_m, 0, np.where(t_box < t_ground, 2, 1)).astype(np.uint8)
         raw = np.where(t > lidar.max_range_m, 65535, np.clip(np.round(t * 100), 1, 65534)).astype(np.uint16)
         if dropout > 0:

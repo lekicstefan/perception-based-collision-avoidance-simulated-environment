@@ -1,0 +1,43 @@
+== height
+scans 211, detectable hazard-scans 600, recall 0.972, precision 1.000 (0 of 643 clusters match no hazard), fragmented 0.086, merged into a neighbour 0.028 (counted as missed)
+  corrected centre error (m)         median +0.226   90th pct of |e| 1.777   max |e| 2.042
+  centroid error (m)                 median +0.500   90th pct of |e| 2.198   max |e| 2.254
+  nearest-point range error (m)      median -0.018   90th pct of |e| 0.044   max |e| 1.174
+  width error (m)                    median -0.044   90th pct of |e| 0.421   max |e| 2.746
+  recall by true range (m): [0.0, 20.0) 0.96 (n=145), [20.0, 40.0) 0.97 (n=152), [40.0, 60.0) 0.98 (n=95), [60.0, 80.0) 0.98 (n=118), [80.0, inf) 0.98 (n=90)
+  recall by returned cells: [0.0, 1.0) 0.00 (n=14), [2.0, 3.0) 0.93 (n=15), [3.0, 6.0) 0.97 (n=70), [6.0, 11.0) 0.91 (n=46), [11.0, inf) 0.98 (n=469)
+  recall by hazard: crate 1.00 (n=146), crossing_vehicle 1.00 (n=108), parked_car 0.99 (n=128), pedestrian 1.00 (n=82), person 0.88 (n=136)
+  fragmented by hazard: crate 0.00 (n=146), crossing_vehicle 0.24 (n=108), parked_car 0.15 (n=127), pedestrian 0.00 (n=82), person 0.04 (n=120)
+
+== height+camera
+scans 211, detectable hazard-scans 600, recall 0.972, precision 1.000 (0 of 643 clusters match no hazard), fragmented 0.086, merged into a neighbour 0.028 (counted as missed)
+  corrected centre error (m)         median +0.228   90th pct of |e| 1.776   max |e| 2.041
+  centroid error (m)                 median +0.500   90th pct of |e| 2.198   max |e| 2.254
+  nearest-point range error (m)      median -0.018   90th pct of |e| 0.044   max |e| 1.174
+  width error (m)                    median -0.013   90th pct of |e| 0.380   max |e| 2.746
+  recall by true range (m): [0.0, 20.0) 0.96 (n=145), [20.0, 40.0) 0.97 (n=152), [40.0, 60.0) 0.98 (n=95), [60.0, 80.0) 0.98 (n=118), [80.0, inf) 0.98 (n=90)
+  recall by returned cells: [0.0, 1.0) 0.00 (n=14), [2.0, 3.0) 0.93 (n=15), [3.0, 6.0) 0.97 (n=70), [6.0, 11.0) 0.91 (n=46), [11.0, inf) 0.98 (n=469)
+  recall by hazard: crate 1.00 (n=146), crossing_vehicle 1.00 (n=108), parked_car 0.99 (n=128), pedestrian 1.00 (n=82), person 0.88 (n=136)
+  fragmented by hazard: crate 0.00 (n=146), crossing_vehicle 0.24 (n=108), parked_car 0.15 (n=127), pedestrian 0.00 (n=82), person 0.04 (n=120)
+
+== range_image
+scans 211, detectable hazard-scans 600, recall 0.962, precision 1.000 (0 of 640 clusters match no hazard), fragmented 0.090, merged into a neighbour 0.023 (counted as missed)
+  corrected centre error (m)         median +0.226   90th pct of |e| 1.773   max |e| 2.042
+  centroid error (m)                 median +0.501   90th pct of |e| 2.197   max |e| 2.317
+  nearest-point range error (m)      median -0.016   90th pct of |e| 0.044   max |e| 1.174
+  width error (m)                    median -0.043   90th pct of |e| 0.445   max |e| 2.746
+  recall by true range (m): [0.0, 20.0) 0.96 (n=145), [20.0, 40.0) 0.98 (n=152), [40.0, 60.0) 0.98 (n=95), [60.0, 80.0) 0.98 (n=118), [80.0, inf) 0.89 (n=90)
+  recall by returned cells: [0.0, 1.0) 0.00 (n=14), [2.0, 3.0) 0.47 (n=15), [3.0, 6.0) 0.96 (n=70), [6.0, 11.0) 0.91 (n=46), [11.0, inf) 0.98 (n=469)
+  recall by hazard: crate 1.00 (n=146), crossing_vehicle 1.00 (n=108), parked_car 0.99 (n=128), pedestrian 1.00 (n=82), person 0.84 (n=136)
+  fragmented by hazard: crate 0.00 (n=146), crossing_vehicle 0.24 (n=108), parked_car 0.17 (n=127), pedestrian 0.00 (n=82), person 0.04 (n=114)
+
+== range_image+camera
+scans 211, detectable hazard-scans 600, recall 0.962, precision 1.000 (0 of 640 clusters match no hazard), fragmented 0.090, merged into a neighbour 0.023 (counted as missed)
+  corrected centre error (m)         median +0.229   90th pct of |e| 1.774   max |e| 2.041
+  centroid error (m)                 median +0.501   90th pct of |e| 2.197   max |e| 2.317
+  nearest-point range error (m)      median -0.016   90th pct of |e| 0.044   max |e| 1.174
+  width error (m)                    median -0.013   90th pct of |e| 0.383   max |e| 2.746
+  recall by true range (m): [0.0, 20.0) 0.96 (n=145), [20.0, 40.0) 0.98 (n=152), [40.0, 60.0) 0.98 (n=95), [60.0, 80.0) 0.98 (n=118), [80.0, inf) 0.89 (n=90)
+  recall by returned cells: [0.0, 1.0) 0.00 (n=14), [2.0, 3.0) 0.47 (n=15), [3.0, 6.0) 0.96 (n=70), [6.0, 11.0) 0.91 (n=46), [11.0, inf) 0.98 (n=469)
+  recall by hazard: crate 1.00 (n=146), crossing_vehicle 1.00 (n=108), parked_car 0.99 (n=128), pedestrian 1.00 (n=82), person 0.84 (n=136)
+  fragmented by hazard: crate 0.00 (n=146), crossing_vehicle 0.24 (n=108), parked_car 0.17 (n=127), pedestrian 0.00 (n=82), person 0.04 (n=114)

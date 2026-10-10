@@ -44,7 +44,8 @@ def test_the_corrected_centre_lies_behind_the_nearest_surface_by_half_the_depth_
     assert g.centre_xy[0] - g.nearest_point[0] == pytest.approx(0.5, abs=0.05)
     g2 = geometries(Scene().add_box(30, 0, 0.6, 0.5, 1.7), size_prior_m=2.0)[0]
     assert g2.centre_xy[0] - g2.nearest_point[0] == pytest.approx(1.0, abs=0.05)
-    assert g.width_m == pytest.approx(0.5, abs=0.2) and g.top_m == pytest.approx(1.55, abs=0.2)
+    assert g.width_m == pytest.approx(0.5, abs=0.3)                       # within one cell (0.26 m here)
+    assert g.top_m == pytest.approx(1.55, abs=0.2)
 
 
 def test_a_visible_depth_larger_than_the_prior_is_used():
