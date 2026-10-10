@@ -44,7 +44,7 @@ class ClusterGeometry:
     centroid_xy: np.ndarray          # (2,) mean of the visible points (for comparison only, do not track this)
     box_xy: tuple                    # (x_min, x_max, y_min, y_max) axis-aligned in the vehicle frame
     bearing: float                   # rad, direction of the cluster seen from the sensor (positive to the left)
-    width_m: float                   # visible extent across the line of sight
+    width_m: float                   # visible extent across the line of sight (cell centres, plus one cell width)
     depth_m: float                   # visible extent along the line of sight
     height_m: float                  # vertical extent of the visible points
     top_m: float                     # height of the highest point above the ground plane
@@ -60,6 +60,7 @@ class GeometryExtractor:
     def __init__(self, geometry: LidarGeometry, size_prior_m: float = 1.0):
         self.geometry = geometry
         self.size_prior_m = size_prior_m
+        self.az_step = float(geometry.alpha_h.mean())                 # rad between neighbouring columns
 
     def extract_all(self, img: RangeImage, seg: Segmentation) -> list:
         pts = self.geometry.points_vehicle(img)
@@ -87,5 +88,6 @@ class GeometryExtractor:
             label=c.label, n_cells=len(p), points=p, nearest_point=p[i], nearest_range_m=float(range_m[c.rows[i], c.cols[i]]),
             centre_xy=centre, centroid_xy=centroid,
             box_xy=(float(p[:, 0].min()), float(p[:, 0].max()), float(p[:, 1].min()), float(p[:, 1].max())),
-            bearing=math.atan2(to[1], to[0]), width_m=float(pv.max() - pv.min()), depth_m=depth,
+            bearing=math.atan2(to[1], to[0]), depth_m=depth,
+            width_m=float(pv.max() - pv.min()) + float(np.median(range_m[c.rows, c.cols])) * self.az_step,      # + one cell
             height_m=float(hh.max() - hh.min()), top_m=float(hh.max()))

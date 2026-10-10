@@ -4,7 +4,7 @@ import math
 import numpy as np
 import pytest
 
-from server.perception.ground import GroundConfig, GroundMethod, GroundRemover
+from server.perception.ground import GroundConfig, GroundMethod, GroundRemover, _isolated_runs
 from server.perception.segmentation import beta_labels
 from testing.support.synthetic_scene import Scene, make_lidar
 from testing.support.paths import RECORDINGS_DIR
@@ -163,3 +163,20 @@ def test_a_recorded_scan_runs_through_both_methods(method):
     assert mask.shape == img.shape and mask.dtype == bool
     assert not (mask & ~img.valid).any()
     assert mask.any()                                                           # there is road in a driving scene
+
+
+def test_a_person_far_away_is_not_swallowed_by_the_ground():
+    """78 m away the beams are 10 m apart on the ground, so the lowest cell of a person is only a gentle rise from the last
+    ground cell. The person has two cells there; both must stay candidates (found by the evaluation of step 5.7)."""
+    img, truth, geo, mask = run(Scene().add_box(78, 0, 0.6, 0.5, 1.7), GroundMethod.RANGE_IMAGE)
+    person = truth == 2
+    assert person.sum() == 2 and not (mask & person).any()
+    assert ground_recall(truth, mask) > 0.99
+
+
+def test_runs_of_returns_with_max_range_on_both_sides_are_isolated():
+    valid = np.array([0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0], dtype=bool)
+    maxr = ~valid
+    assert list(np.flatnonzero(_isolated_runs(valid, maxr, 4))) == [1, 2, 12]       # the run of 6 is too long to be an object
+    assert not _isolated_runs(valid, np.zeros_like(valid), 4).any()                # no max range next to them: not isolated
+    assert not _isolated_runs(np.array([1, 1, 0], dtype=bool), np.array([0, 0, 1], dtype=bool), 4).any()   # at the image edge

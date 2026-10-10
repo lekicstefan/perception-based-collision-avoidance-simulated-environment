@@ -46,3 +46,24 @@ def test_a_lidar_message_takes_the_camera_frame_from_the_buffer():
     raw = P.build_message(P.MsgType.LIDAR, 1, P.lidar_payload(ranges), t=img.t)
     result = pipe.process_message(raw)
     assert result.refinements                                                   # the buffered frame was used
+
+
+def test_a_person_standing_next_to_a_parked_car_is_a_cluster_of_its_own():
+    """5.8: the person touches the car's side (taller than it by 0.3 m); both are found, with each ground method and with
+    and without the camera, and the person's nearest point and width are those of a person, not of the car."""
+    boxes = [(20, 0, 4.5, 1.8, 1.5), (19.0, 1.15, 0.6, 0.5, 1.8)]
+    for method in GroundMethod:
+        for refine in (False, True):
+            scene = Scene()
+            for b in boxes:
+                scene.add_box(*b)
+            img = scene.render(LIDAR)[0]
+            cfg = PerceptionConfig(ground=GroundConfig(method=method), refinement=RefinementConfig(enabled=refine))
+            pipe = PerceptionPipeline(CALIB, cfg)
+            hdr = SimpleNamespace(t=img.t, pose=img.pose) if refine else None
+            result = pipe.process(img, hdr, render(CAMERA, boxes) if refine else None)
+            assert len(result.clusters) == 2, (method, refine)
+            person = min(result.clusters, key=lambda g: g.n_cells)
+            car = max(result.clusters, key=lambda g: g.n_cells)
+            assert person.width_m < 1.0 and car.width_m > 1.5
+            assert abs(person.nearest_point[1] - 0.9) < 0.4                       # on the car's side, not at its middle

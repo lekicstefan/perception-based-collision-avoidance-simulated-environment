@@ -134,3 +134,39 @@ def test_a_recorded_scan():
         assert seg.labels.shape == img.shape
         assert not ((seg.labels >= 0) & ~cand).any()                             # clusters only hold candidate cells
         assert sum(c.n_cells for c in seg.clusters) == int((seg.labels >= 0).sum())
+
+
+@pytest.mark.xfail(reason="known issue: a thin tall object in front of a wide low one cuts the wide one into a left and a right "
+                          "cluster, because the columns behind the pole are boundaries. A later step may bridge such gaps.",
+                   strict=False)
+def test_a_pole_in_front_of_a_wide_object_does_not_split_it():
+    lidar = make_lidar(cols=601)
+    img, truth, geo = Scene().add_box(30, 0, 0.6, 8.0, 0.8).add_box(15, 0, 0.2, 0.2, 3.0).render(lidar)
+    seg = Segmenter(geo).segment(img, GroundRemover(geo).candidates(img))
+    widest = max(seg.clusters, key=lambda c: c.cols.max() - c.cols.min())
+    assert widest.cols.min() <= 262 and widest.cols.max() >= 338                 # one cluster over the whole width of the box
+
+
+def test_a_taller_person_flush_against_the_car_front_is_split_off_by_height():
+    # same front plane, so no depth step at all: only the 0.3 m height difference tells them apart
+    scene = Scene().add_box(12, 0, 4.5, 1.8, 1.5).add_box(10.0, 1.15, 0.6, 0.5, 1.8)
+    assert len(segment(scene)[-1].clusters) == 2
+    assert len(segment(scene, SegmentationConfig(split_height_beam_factor=1.5))[-1].clusters) == 1   # the old, stricter rule
+
+
+def test_a_person_as_tall_as_the_car_and_flush_against_it_cannot_be_told_apart():
+    """Known limit: no depth step and no height step, the range image has nothing to cut at."""
+    scene = Scene().add_box(12, 0, 4.5, 1.8, 1.7).add_box(10.0, 1.15, 0.6, 0.5, 1.7)
+    assert len(segment(scene)[-1].clusters) == 1
+
+
+def test_the_roof_strip_seen_from_above_stays_with_the_car():
+    scene = Scene().add_box(25, 0, 4.5, 1.8, 1.0)                 # the sensor is 1.8 m up: it sees the roof, far behind the front
+    assert len(segment(scene, SegmentationConfig(merge_caps=False))[-1].clusters) == 2     # the angle test cuts the roof off
+    assert len(segment(scene)[-1].clusters) == 1
+
+
+def test_a_person_behind_a_low_car_is_not_taken_for_its_roof():
+    scene = Scene().add_box(20, 0, 4.5, 1.8, 1.0).add_box(24.0, 0, 0.6, 0.5, 1.8)
+    sizes = sorted(c.n_cells for c in segment(scene)[-1].clusters)
+    assert len(sizes) == 2 and sizes[0] >= 5

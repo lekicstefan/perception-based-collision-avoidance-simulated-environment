@@ -21,36 +21,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from PIL import Image
 
-import cv2
-import numpy as np
-
 from server.communication import protocol as P
 from server.geometry.calibration import Calibration
 from server.perception.camera_refinement import RefinementConfig
 from server.perception.ground import GroundConfig, GroundMethod
 from server.perception.pipeline import PerceptionConfig, PerceptionPipeline
 from testing.support import scan_view
-from testing.support.dev_recording import camera_path, load_camera_index, load_lidar, load_pose
-from testing.support.paths import DATA_DIR, RECORDINGS_DIR
-
-
-def lidar_message(rec) -> bytes:
-    return P.build_message(P.MsgType.LIDAR, int(rec["frame"]), P.lidar_payload(rec["ranges"]), t=float(rec["t"]),
-                           pose=tuple(rec["pose"]), speed=float(rec["motion"][0]), yaw_rate=float(rec["motion"][1]),
-                           steering_angle=float(rec["motion"][2]))
-
-
-def camera_for(folder: Path, cam_index, pose_df, t: float, max_gap: float):
-    """(header-like with pose and t, rgb image) of the recorded camera frame closest to t, or (None, None)."""
-    i = int(np.argmin(np.abs(cam_index["t"].to_numpy() - t)))
-    ct = float(cam_index["t"].iloc[i])
-    if abs(ct - t) > max_gap:
-        return None, None
-    bgr = cv2.imread(str(camera_path(folder, int(cam_index["frame"].iloc[i]))))
-    if bgr is None:
-        return None, None
-    pose = tuple(float(np.interp(ct, pose_df["t"], pose_df[c])) for c in ("x", "y", "z", "yaw", "pitch", "roll"))
-    return SimpleNamespace(t=ct, pose=pose), cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+from testing.support.dev_recording import load_lidar
+from testing.support.paths import DATA_DIR
+from testing.support.replay_scans import CameraFrames, lidar_message, resolve
 
 
 def demo(args, out: Path):
@@ -127,9 +106,7 @@ def main():
         return demo(args, out)
     if not args.recording:
         ap.error("give --recording (or --demo)")
-    folder = Path(args.recording)
-    if not folder.exists():
-        folder = RECORDINGS_DIR / args.recording
+    folder = resolve(args.recording)
     calib = Calibration.from_json(folder / "calibration.json")
     scans = load_lidar(folder)
     if args.frames:
@@ -138,13 +115,12 @@ def main():
     else:
         picks = [args.frame or 0]
     pipe = make_pipeline(calib, args)
-    cam_index = load_camera_index(folder) if args.camera else None
-    pose_df = load_pose(folder) if args.camera else None
     image_paths = []
+    frames = CameraFrames(folder) if args.camera else None
     for k in picks:
         rec = scans[k]
         img = pipe.builder.ingest(lidar_message(rec))
-        hdr, rgb = camera_for(folder, cam_index, pose_df, img.t, pipe.config.refinement.max_time_gap_s) if args.camera else (None, None)
+        hdr, rgb = frames.closest(img.t, pipe.config.refinement.max_time_gap_s) if frames else (None, None)
         result = pipe.process(img, hdr, rgb)
         image_path = out / f"{folder.name}_scan{k:05d}.png"
         write(image_path, result, calib, pipe.builder.geometry, rgb)
