@@ -10,10 +10,13 @@
 A new track starts tentative with the position of its first measurement and a large velocity uncertainty (the filter does
 that). Only confirmed and coasting tracks are reported to the risk stage (confirmation keeps single-scan noise from braking
 the car). A coasting track keeps predicting with its velocity; its covariance grows with every miss, so the gate grows too.
+How long a coasting track lives: K misses, more (`coast_bonus_misses`) for an old track with a high hit ratio, and as long
+as a camera bearing keeps arriving (`camera_keep_s`) up to `hard_miss_factor` x K misses.
 The track also remembers the largest extent it has been seen with (a partial view of a big object is then recognisable).
 """
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 
@@ -21,6 +24,7 @@ import numpy as np
 
 from server.tracking.kalman import ConstantVelocityFilter
 from server.tracking.measurement import WorldCluster
+from server.tracking.raw_baseline import raw_velocity
 
 
 class TrackState(str, Enum):
@@ -35,6 +39,12 @@ class TrackConfig:
     max_misses: int = 5                 # K: consecutive misses after which a confirmed track is deleted
     tentative_max_misses: int = 2       # consecutive misses after which a tentative track is deleted
     merge_scans: int = 3                # scans in which a track must be explained by another track's cluster to be merged into it
+    existence_window: int = 50          # scans over which the hit ratio (existence) is taken
+    coast_bonus_misses: int = 5         # a long-lived, reliably seen track survives this many more misses ...
+    coast_bonus_min_ratio: float = 0.8  # ... when its hit ratio is at least this ...
+    coast_bonus_min_age: int = 20       # ... and it is at least this many scans old (0 bonus misses: the plain rule of K)
+    camera_keep_s: float = 1.0          # a coasting track with a camera bearing this recently is not deleted for its misses ...
+    hard_miss_factor: int = 3           # ... until it has missed this many times K
 
 
 class Track:
@@ -48,6 +58,11 @@ class Track:
         self.consecutive_hits = 1
         self.misses = 0                 # consecutive scans without a measurement
         self.age_scans = 1
+        self.history = deque([True], maxlen=config.existence_window)       # LiDAR hit (True) or miss per scan
+        self.raw_velocity = None                                            # two-frame difference of the last two measurements (baseline)
+        self._prev_measurement = (flt.position.copy(), flt.t)
+        self.static = False                                                 # motion flag (outputs.py)
+        self.static_count = 0
         self.camera_hits = 0            # camera bearing updates applied (step 6.6); evidence of existence for the risk stage
         self.last_camera_t = None
         self.shared = 0                 # consecutive scans in which another track's cluster also fits this track (merge test)
@@ -61,11 +76,14 @@ class Track:
     def hit(self, w: WorldCluster, z, r, t: float) -> bool:
         """A measurement was assigned. Returns True when this hit confirmed the track."""
         self.filter.update(z, r, t)
+        self.raw_velocity = raw_velocity(*self._prev_measurement, z, t)
+        self._prev_measurement = (np.asarray(z, dtype=float).copy(), t)
         self.hits += 1
         self.consecutive_hits += 1
         self.misses = 0
         self.shared = 0
         self.age_scans += 1
+        self.history.append(True)
         self.last_hit_t = t
         self.last_cluster = w
         self.max_width_m = max(self.max_width_m, w.width_m)
@@ -89,13 +107,32 @@ class Track:
         self.consecutive_hits = 0
         self.misses += 1
         self.age_scans += 1
+        self.history.append(False)
         if self.state == TrackState.CONFIRMED:
             self.state = TrackState.COASTING
         if self.state == TrackState.TENTATIVE:
             return self.misses > self.config.tentative_max_misses
-        return self.misses >= self.config.max_misses
+        cfg = self.config
+        limit = cfg.max_misses
+        if self.age_scans >= cfg.coast_bonus_min_age and self.reliability >= cfg.coast_bonus_min_ratio:
+            limit += cfg.coast_bonus_misses
+        if self.last_camera_t is not None and t - self.last_camera_t <= cfg.camera_keep_s:
+            limit = max(limit, cfg.hard_miss_factor * cfg.max_misses)         # the camera still sees it
+        return self.misses >= limit
 
     # ---- outputs ----------------------------------------------------------------------------------------------------
+    @property
+    def hit_ratio(self) -> float:
+        """Share of the last `existence_window` scans (or of all scans of a younger track) with a LiDAR measurement."""
+        return sum(self.history) / len(self.history)
+
+    @property
+    def reliability(self) -> float:
+        """The hit ratio before the current run of misses: how reliably the track was seen until it was lost (the misses of
+        the run itself must not take the bonus away while it is being used)."""
+        n = len(self.history) - self.misses
+        return sum(self.history) / n if n > 0 else 0.0
+
     @property
     def reported(self) -> bool:
         """Confirmed and coasting tracks go on to the risk stage."""

@@ -28,6 +28,7 @@ from server.tracking.bearing import BearingConfig, CameraResult, measure_bearing
 from server.tracking.kalman import ConstantVelocityFilter, FilterConfig
 from server.tracking.measurement import WorldCluster
 from server.tracking.noise import MeasurementNoise, measurement_of
+from server.tracking.outputs import OutputConfig, TrackOutput, track_output, update_motion_state
 from server.tracking.track import Track, TrackConfig, TrackState
 
 
@@ -38,6 +39,7 @@ class TrackerConfig:
     filter: FilterConfig = field(default_factory=FilterConfig)
     track: TrackConfig = field(default_factory=TrackConfig)
     bearing: BearingConfig = field(default_factory=BearingConfig)
+    output: OutputConfig = field(default_factory=OutputConfig)
 
 
 @dataclass
@@ -96,7 +98,13 @@ class Tracker:
             self._next_id += 1
             self.tracks.append(tr)
             out.births.append((tr.id, j))
+        for tr in self.tracks:
+            update_motion_state(tr, cfg.output)
         return out
+
+    def outputs(self) -> list:
+        """The derived outputs (outputs.py) of the confirmed and coasting tracks."""
+        return [track_output(tr, self.config.output) for tr in self.reported]
 
     def step_camera(self, rgb, pose, t: float, camera, diagnostics: list | None = None) -> list:
         """One camera frame captured at time t with the car at `pose`. Returns a CameraResult per reported track. When a list is
