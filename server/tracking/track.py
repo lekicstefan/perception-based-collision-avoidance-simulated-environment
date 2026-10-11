@@ -48,6 +48,8 @@ class Track:
         self.consecutive_hits = 1
         self.misses = 0                 # consecutive scans without a measurement
         self.age_scans = 1
+        self.camera_hits = 0            # camera bearing updates applied (step 6.6); evidence of existence for the risk stage
+        self.last_camera_t = None
         self.shared = 0                 # consecutive scans in which another track's cluster also fits this track (merge test)
         self.last_hit_t = flt.t
         self.last_cluster = w
@@ -76,9 +78,14 @@ class Track:
             self.state = TrackState.CONFIRMED
         return was == TrackState.TENTATIVE and self.state == TrackState.CONFIRMED
 
+    def camera_hit(self, t: float) -> None:
+        self.camera_hits += 1
+        self.last_camera_t = t
+
     def miss(self, t: float) -> bool:
         """No measurement in this scan. Returns True when the track is to be deleted."""
-        self.filter.predict(t)
+        if t > self.filter.t:                                       # a camera update may already have moved the track past t
+            self.filter.predict(t)
         self.consecutive_hits = 0
         self.misses += 1
         self.age_scans += 1

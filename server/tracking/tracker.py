@@ -12,6 +12,11 @@
                    with fewer hits is deleted ("two objects whose clusters fuse")
   6. births        every unassigned measurement starts a new tentative track ("the other part of a split cluster")
 
+`Tracker.step_camera(rgb, pose, t, camera)` is the second input, at the camera rate and with the camera time stamp (step 6.6):
+every reported track gets a bearing measurement from the edges in its predicted image region (bearing.py) and an extended
+Kalman update. It does not create, confirm or delete tracks and does not reset the misses of the LiDAR lifecycle; it counts
+`track.camera_hits`, the evidence that a coasting track is still in the picture.
+
 Nothing here knows about classes or sizes. The step returns what happened so that tools and tests can follow the tracks.
 """
 from __future__ import annotations
@@ -19,6 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from server.tracking.association import AssociationConfig, associate
+from server.tracking.bearing import BearingConfig, CameraResult, measure_bearing, prepare_frame
 from server.tracking.kalman import ConstantVelocityFilter, FilterConfig
 from server.tracking.measurement import WorldCluster
 from server.tracking.noise import MeasurementNoise, measurement_of
@@ -31,6 +37,7 @@ class TrackerConfig:
     association: AssociationConfig = field(default_factory=AssociationConfig)
     filter: FilterConfig = field(default_factory=FilterConfig)
     track: TrackConfig = field(default_factory=TrackConfig)
+    bearing: BearingConfig = field(default_factory=BearingConfig)
 
 
 @dataclass
@@ -89,4 +96,33 @@ class Tracker:
             self._next_id += 1
             self.tracks.append(tr)
             out.births.append((tr.id, j))
+        return out
+
+    def step_camera(self, rgb, pose, t: float, camera, diagnostics: list | None = None) -> list:
+        """One camera frame captured at time t with the car at `pose`. Returns a CameraResult per reported track. When a list is
+        given as `diagnostics`, the BearingMeasurement of every track (with its ROI and expected extent) is appended to it."""
+        cfg = self.config.bearing
+        if not cfg.enabled:
+            return []
+        frame = prepare_frame(rgb, cfg)
+        out = []
+        for tr in self.tracks:
+            if not tr.reported:
+                continue
+            m = measure_bearing(tr, frame, camera, pose, t, cfg)
+            if diagnostics is not None:
+                diagnostics.append(m)
+            if m.theta is None:
+                out.append(CameraResult(tr.id, m.reason))
+                continue
+            d2 = tr.filter.gate_distance2_bearing(m.theta, m.sigma, m.cam_xy, t)
+            if d2 > cfg.gate_chi2:
+                out.append(CameraResult(tr.id, "gated", nis=d2))
+                continue
+            r = tr.filter.update_bearing(m.theta, m.sigma, m.cam_xy, t)
+            if r.applied:
+                tr.camera_hit(t)
+                out.append(CameraResult(tr.id, r.reason, float(r.innovation[0]), r.nis))
+            else:
+                out.append(CameraResult(tr.id, r.reason))
         return out
