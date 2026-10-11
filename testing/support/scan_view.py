@@ -4,7 +4,8 @@
                 lighter and paler, farther cells darker (shading is relative to that cluster). Ground is tan, cells of
                 discarded (too small) clusters are dark red, no return is black, max range or sky is dark blue.
   top view      the same cells seen from above (x forward is up, y left is left), ego car, range rings, the nearest point
-                (white cross) and the corrected box centre (yellow ring) of every cluster.
+                (white cross), the corrected box centre (yellow ring) and the centroid (orange diamond) of every cluster, its
+                bounding box (thin grey), and with ground truth the true footprint and centre of every hazard (green).
   camera panel  the camera frame closest in time with the projected LiDAR extent (blue) and the refined extent (green).
 """
 from __future__ import annotations
@@ -102,12 +103,21 @@ def range_panel(result: PerceptionResult, calibration, sx: int = 3, sy: int = 14
 
 
 def top_view(result: PerceptionResult, calibration, geometry, view_range_m: float = 50.0, half_width_m: float = 25.0,
-             px_per_m: float = 10.0) -> np.ndarray:
-    h, w = int(view_range_m * px_per_m) + 30, int(2 * half_width_m * px_per_m)
-    canvas = np.full((h, w, 3), BACKGROUND, dtype=np.uint8)
+             px_per_m: float = 10.0, truths=None, focus=None) -> np.ndarray:
+    """`truths`: TruthObjects (vehicle frame, testing/support/ground_truth.py) to draw as green footprints.
+    `focus` = (x, y, half_m): a square window of 2 * half_m metres centred on that vehicle-frame point instead of the road."""
+    if focus is None:
+        h, w = int(view_range_m * px_per_m) + 30, int(2 * half_width_m * px_per_m)
+    else:
+        h = w = 500
+        px_per_m = w / (2.0 * focus[2])
 
     def pix(x, y):
+        if focus is not None:
+            return int(round(w / 2 - (y - focus[1]) * px_per_m)), int(round(h / 2 - (x - focus[0]) * px_per_m))
         return int(round(w / 2 - y * px_per_m)), int(round(h - 20 - x * px_per_m))
+    canvas = np.full((h, w, 3), BACKGROUND, dtype=np.uint8)
+    dot = max(2, int(px_per_m * 0.05))
 
     for r in range(10, int(view_range_m) + 1, 10):                                 # range rings
         cv2.circle(canvas, pix(0, 0), int(r * px_per_m), (60, 60, 66), 1, cv2.LINE_AA)
@@ -122,17 +132,27 @@ def top_view(result: PerceptionResult, calibration, geometry, view_range_m: floa
             continue
         x, y = pix(flat_p[i, 0], flat_p[i, 1])
         if 0 <= x < w and 0 <= y < h:
-            cv2.circle(canvas, (x, y), 2, tuple(int(v) for v in flat_c[i]), -1)
+            cv2.circle(canvas, (x, y), dot, tuple(int(v) for v in flat_c[i]), -1)
     e = calibration.ego                                                            # the ego car
     p0, p1 = pix(e.length - e.rear_overhang, e.width / 2), pix(-e.rear_overhang, -e.width / 2)
     cv2.rectangle(canvas, p0, p1, (235, 235, 235), 1, cv2.LINE_AA)
+    for o in (truths or []):                                                       # ground truth: footprint and centre
+        poly = np.array([pix(c[0], c[1]) for c in o.footprint()], dtype=np.int32)
+        cv2.polylines(canvas, [poly], True, (70, 200, 90), 1, cv2.LINE_AA)
+        tx, ty = pix(o.centre[0], o.centre[1])
+        cv2.circle(canvas, (tx, ty), 2, (70, 200, 90), -1, cv2.LINE_AA)
+        _text(canvas, f"id{o.id}", (tx + 5, ty + 12), 0.36, (70, 200, 90))
     for g in result.clusters:
+        x0, x1, y0, y1 = g.box_xy
+        cv2.rectangle(canvas, pix(x0, y1), pix(x1, y0), (110, 110, 120), 1, cv2.LINE_AA)
         nx, ny = pix(g.nearest_point[0], g.nearest_point[1])
         cv2.drawMarker(canvas, (nx, ny), (255, 255, 255), cv2.MARKER_CROSS, 9, 1, cv2.LINE_AA)
         cx, cy = pix(g.centre_xy[0], g.centre_xy[1])
         cv2.circle(canvas, (cx, cy), 7, (60, 220, 255), 1, cv2.LINE_AA)
-        _text(canvas, f"#{g.label}", (cx + 9, cy - 6), 0.4)
-    _text(canvas, "top view: nearest point +, corrected centre o", (6, 14), 0.42)
+        mx, my = pix(g.centroid_xy[0], g.centroid_xy[1])
+        cv2.drawMarker(canvas, (mx, my), (255, 150, 40), cv2.MARKER_DIAMOND, 9, 1, cv2.LINE_AA)
+        _text(canvas, f"#{g.label} n{g.n_cells}", (cx + 9, cy - 6), 0.4)
+    _text(canvas, "top view: nearest +, centre o, centroid <>, box grey" + (", truth green" if truths else ""), (6, 14), 0.42)
     return canvas
 
 

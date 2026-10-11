@@ -10,6 +10,11 @@
 --ground       range_image (default) or height: the ground-removal method
 --camera       add the camera frame closest in time, with the LiDAR and refined extents; also switches the refinement on
 --no-refine    with --camera: show the extents but do not apply the refinement
+--truth        draw the ground-truth footprints and centres of the hazards in the top view (needs the ground-truth files)
+--view-range   depth of the top view in metres (default 50)
+--focus ID     with --truth: top view zoomed on this hazard (id as in hazards.csv), a square of 2 x --focus-radius metres
+--focus-radius half side of the zoomed window in metres (default 8)
+--gif FPS      also make a gif of the written images
 --out          output folder, default testing/data/scan_views
 Every image has the range image on top (each segment in its own colour, closer = lighter and paler, farther = darker;
 ground tan, discarded clusters dark red, no return black, max range dark blue) and below it the top view and the
@@ -28,6 +33,7 @@ from server.perception.ground import GroundConfig, GroundMethod
 from server.perception.pipeline import PerceptionConfig, PerceptionPipeline
 from testing.support import scan_view
 from testing.support.dev_recording import load_lidar
+from testing.support.ground_truth import GroundTruth
 from testing.support.paths import DATA_DIR
 from testing.support.replay_scans import CameraFrames, lidar_message, resolve
 
@@ -80,8 +86,8 @@ def make_gif(image_paths: list[Path], output_path: Path, fps: float):
             frame.close()
 
 
-def write(path: Path, result, calib, geo, rgb):
-    panels = [scan_view.range_panel(result, calib), scan_view.top_view(result, calib, geo)]
+def write(path: Path, result, calib, geo, rgb, truths=None, view_range_m: float = 50.0, focus=None):
+    panels = [scan_view.range_panel(result, calib), scan_view.top_view(result, calib, geo, view_range_m=view_range_m, truths=truths, focus=focus)]
     if rgb is not None:
         panels.append(scan_view.camera_panel(result, rgb))
     scan_view.save_rgb(path, scan_view.compose(panels))
@@ -98,6 +104,10 @@ def main():
     ap.add_argument("--camera", action="store_true")
     ap.add_argument("--no-refine", action="store_true")
     ap.add_argument("--out", default=str(DATA_DIR / "scan_views"))
+    ap.add_argument("--truth", action="store_true")
+    ap.add_argument("--focus", type=int, default=None)
+    ap.add_argument("--focus-radius", type=float, default=8.0)
+    ap.add_argument("--view-range", type=float, default=50.0)
     ap.add_argument("--gif", type=int, default=None)
     args = ap.parse_args()
     out = Path(args.out)
@@ -117,13 +127,21 @@ def main():
     pipe = make_pipeline(calib, args)
     image_paths = []
     frames = CameraFrames(folder) if args.camera else None
+    truth = GroundTruth.load(folder) if args.truth and GroundTruth.exists(folder) else None
+    if args.truth and truth is None:
+        print("no ground-truth files in", folder, "- drawing without truth")
     for k in picks:
         rec = scans[k]
         img = pipe.builder.ingest(lidar_message(rec))
         hdr, rgb = frames.closest(img.t, pipe.config.refinement.max_time_gap_s) if frames else (None, None)
         result = pipe.process(img, hdr, rgb)
+        objs = truth.objects_at(img.t) if truth else None
+        focus = None
+        if args.focus is not None and objs:
+            hit = [o for o in objs if o.id == args.focus]
+            focus = (float(hit[0].centre[0]), float(hit[0].centre[1]), args.focus_radius) if hit else None
         image_path = out / f"{folder.name}_scan{k:05d}.png"
-        write(image_path, result, calib, pipe.builder.geometry, rgb)
+        write(image_path, result, calib, pipe.builder.geometry, rgb, objs, args.view_range, focus)
         image_paths.append(image_path)
     if args.gif is not None and args.gif > 0 and image_paths:
         make_gif(image_paths, out / f"{folder.name}.gif", args.gif)
