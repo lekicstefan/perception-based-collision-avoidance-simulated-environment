@@ -1,0 +1,7 @@
+recording dev_default_seed12345, point centre, 211 scans, max coast 1.5 s
+
+ gate_chi2  measurements  correct  switches  duplicates  tracks  d2_mean  d2_p95
+      5.99           640      589        17          28      34     0.50    2.63
+      9.21           640      592        18          24      30     0.65    3.47
+     13.80           640      593        18          23      29     0.79    4.56
+     20.00           640      554        62          18      24     0.86    4.41
