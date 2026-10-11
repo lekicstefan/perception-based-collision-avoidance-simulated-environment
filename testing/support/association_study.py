@@ -1,42 +1,38 @@
-"""Association on a recording with ground truth (step 6.4): how many measurements go to the right track, for several gates.
+"""Tracker on a recording with ground truth (steps 6.4 and 6.5): are the measurements given to the right tracks?
 
-`scan_measurements` runs the perception once and keeps, per scan, every cluster as a world measurement with the id of the
+`scan_measurements` runs the perception once and keeps, per scan, every cluster as a world cluster with the id of the
 hazard it belongs to (the evaluation association of step 5.7; None for a cluster that belongs to no hazard).
-`replay` then runs a bare tracker over those scans for one gate: a track is started from every measurement that is not
-assigned, a track that gets no measurement for `max_coast_s` seconds is deleted (the real lifecycle is step 6.5), and the
-choices of `associate` are scored against the truth:
+`replay` then runs the Tracker (association with the gate, lifecycle, merge) over those scans and scores it against the truth.
+A track takes the hazard of its first measurement; later the hazard of its last assigned measurement.
 
-  correct      measurement given to a track that was started by the same hazard
-  switches     measurement given to a track of another hazard (identity switch: the dangerous error)
-  duplicates   measurement not given to any track although a live track of its hazard exists (the gate was too tight or the
-               track was lost): a second track of the same hazard starts
-  tracks       tracks started in total; ideal is one per hazard
-  d2_mean      mean squared Mahalanobis distance of the correct pairs (about 2 when the noise model is right, larger when
-               R and the process noise are too small) and d2_p95 its 95th percentile (chi-square 2 dof: 5.99)
+  correct      measurement assigned to a track whose last measurement came from the same hazard
+  switches     measurement of another hazard assigned to the track (identity switch: the dangerous error)
+  fragments    measurement that starts a new track although another measurement of the same hazard was assigned in that
+               scan (a cluster split in two: the other part becomes a tentative track, as intended)
+  duplicates   measurement that starts a new track although a live track of its hazard exists that got nothing in that scan
+               (the gate rejected it: partial view, jump)
+  born         tracks started;  confirmed  tracks that reached the confirmed state;  merged  tracks merged into another
+  coverage     share of the (hazard, scan) pairs with a measurement in which a CONFIRMED track got that hazard's measurement
+  d2_mean      mean squared Mahalanobis distance of the correct pairs (about 2 when the noise model fits) and d2_p95 its 95th
+               percentile (chi-square 2 dof: 5.99)
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
 from server.geometry.calibration import Calibration
 from server.perception.pipeline import PerceptionConfig, PerceptionPipeline
-from server.tracking.association import AssociationConfig, associate
-from server.tracking.kalman import ConstantVelocityFilter, FilterConfig
+from server.tracking.association import AssociationConfig
+from server.tracking.kalman import FilterConfig
 from server.tracking.measurement import clusters_to_world
-from server.tracking.noise import MeasurementNoise, measurement_of
+from server.tracking.noise import MeasurementNoise
+from server.tracking.track import TrackConfig, TrackState
+from server.tracking.tracker import Tracker, TrackerConfig
 from testing.support.ground_truth import GroundTruth
 from testing.support.perception_eval import EvalConfig, associate as truth_owner
 from testing.support.replay_scans import run_pipeline
-
-
-@dataclass(frozen=True)
-class ReplayConfig:
-    point: str = "centre"
-    sigma_a: float = 1.5
-    max_coast_s: float = 1.5
 
 
 def scan_measurements(folder, config: PerceptionConfig = PerceptionConfig(), scans=None, use_camera: bool = False,
@@ -56,39 +52,53 @@ def scan_measurements(folder, config: PerceptionConfig = PerceptionConfig(), sca
     return out
 
 
-def replay(scans: list, gate_chi2: float, noise: MeasurementNoise = MeasurementNoise(), cfg: ReplayConfig = ReplayConfig()) -> dict:
-    fcfg = FilterConfig(sigma_a=cfg.sigma_a)
-    tracks = []                                       # dicts: filter, hid (hazard that started it), last (time of the last update)
-    stats = dict(measurements=0, correct=0, switches=0, duplicates=0, tracks=0)
+def replay(scans: list, gate_chi2: float, noise: MeasurementNoise = MeasurementNoise(), point: str = "centre",
+           sigma_a: float = 1.5, track: TrackConfig = TrackConfig()) -> dict:
+    tracker = Tracker(TrackerConfig(point=point, association=AssociationConfig(gate_chi2=gate_chi2),
+                                    filter=FilterConfig(sigma_a=sigma_a), track=track), noise)
+    last_hid = {}                                     # track id -> hazard of its last measurement
+    st = dict(measurements=0, correct=0, switches=0, fragments=0, duplicates=0, born=0, confirmed=0, merged=0)
+    covered = total = 0
     d2_correct, events = [], []
-    acfg = AssociationConfig(gate_chi2=gate_chi2)
     for t, items in scans:
-        tracks = [tr for tr in tracks if t - tr["last"] <= cfg.max_coast_s]
-        meas = [measurement_of(w, noise, cfg.point) for w, _ in items]
-        res = associate([tr["filter"] for tr in tracks], meas, acfg)
-        stats["measurements"] += len(items)
-        live = list(tracks)                                   # the tracks of this association (new ones are added below)
-        for i, j in res.matches:
-            tr, hid = tracks[i], items[j][1]
-            if hid is not None and hid == tr["hid"]:
-                stats["correct"] += 1
-                d2_correct.append(res.d2[i, j])
-            elif hid is not None:
-                stats["switches"] += 1
-                events.append((t, "switch", hid, tr["hid"], float(res.d2[i, j])))
-            z, r, mt = meas[j]
-            tr["filter"].update(z, r, mt)
-            tr["last"] = t
-        for j in res.unmatched_measurements:
-            hid = items[j][1]
-            if hid is not None and any(tr["hid"] == hid for tr in live):
-                stats["duplicates"] += 1
-                best = min(float(res.d2[i, j]) for i, tr in enumerate(live) if tr["hid"] == hid)
-                events.append((t, "duplicate", hid, hid, best))
-            z, r, mt = meas[j]
-            tracks.append(dict(filter=ConstantVelocityFilter.initialise(z, r, mt, fcfg), hid=hid, last=t))
-            stats["tracks"] += 1
+        hids = [h for _, h in items]
+        before = {tr.id for tr in tracker.tracks}
+        res = tracker.step([w for w, _ in items], t)
+        st["measurements"] += len(items)
+        st["confirmed"] += len(res.confirmed)
+        st["merged"] += len(res.merged)
+        state = {tr.id: tr.state for tr in tracker.tracks}
+        got = set()                                   # hazards that had a measurement assigned in this scan
+        for tid, j, d2 in res.matches:
+            h = hids[j]
+            if h is None:
+                continue
+            prev = last_hid.get(tid)
+            if prev is None or prev == h:
+                st["correct"] += 1
+                d2_correct.append(d2)
+            else:
+                st["switches"] += 1
+                events.append((t, "switch", h, prev, d2))
+            last_hid[tid] = h
+            got.add(h)
+        matched_ids = {tid for tid, _, _ in res.matches}
+        for h in {h for h in hids if h is not None}:
+            total += 1
+            if any(hids[j] == h and state.get(tid) == TrackState.CONFIRMED for tid, j, _ in res.matches):
+                covered += 1
+        for tid, j in res.births:
+            h = hids[j]
+            last_hid[tid] = h
+            st["born"] += 1
+            if h is None:
+                continue
+            if h in got:
+                st["fragments"] += 1
+            elif any(last_hid.get(x) == h and x not in matched_ids for x in before if x in state):
+                st["duplicates"] += 1
+                events.append((t, "duplicate", h, h, float("nan")))
     d2 = np.array(d2_correct) if d2_correct else np.array([np.nan])
-    stats.update(d2_mean=float(np.nanmean(d2)), d2_p95=float(np.nanpercentile(d2, 95)), gate_chi2=gate_chi2)
-    stats["events"] = events
-    return stats
+    st.update(coverage=covered / total if total else float("nan"), d2_mean=float(np.nanmean(d2)),
+              d2_p95=float(np.nanpercentile(d2, 95)), gate_chi2=gate_chi2, events=events)
+    return st
