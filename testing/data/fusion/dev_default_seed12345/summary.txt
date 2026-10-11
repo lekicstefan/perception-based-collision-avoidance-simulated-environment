@@ -1,0 +1,16 @@
+recording dev_default_seed12345, 211 scans, camera frames used 630 (every 1), sigma 2.0 px, gate 9.0
+
+        mode  id            label   n  true_speed  pos_rms  cross_rms  along_rms  vel_rms  phantom_rms
+       lidar   1 crossing_vehicle  90         2.5    1.136      0.888      0.708    1.645          NaN
+lidar+camera   1 crossing_vehicle  90         2.5    1.138      0.888      0.711    1.644          NaN
+       lidar   2       pedestrian  70         1.4    0.177      0.024      0.175    0.103          NaN
+lidar+camera   2       pedestrian  70         1.4    0.174      0.024      0.172    0.085          NaN
+       lidar   3            crate 129         0.0    0.044      0.017      0.040    0.072        0.072
+lidar+camera   3            crate 129         0.0    0.044      0.018      0.040    0.071        0.071
+       lidar   4           person  91         0.0    0.214      0.040      0.210    0.220        0.220
+lidar+camera   4           person  91         0.0    0.212      0.040      0.208    0.219        0.219
+       lidar   5       parked_car 107         0.0    1.724      0.529      1.641    0.471        0.471
+lidar+camera   5       parked_car 107         0.0    1.723      0.529      1.640    0.473        0.473
+
+camera track-frames by result: {'ambiguous': 416, 'no_edge': 927, 'ok': 393, 'same_time': 147, 'implausible': 3, 'image_border': 127, 'behind_camera': 41}
+mean normalised innovation squared of the applied updates: 0.10 (about 1 when sigma is right)

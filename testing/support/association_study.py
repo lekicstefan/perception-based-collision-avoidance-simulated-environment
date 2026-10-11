@@ -98,7 +98,7 @@ def replay(scans: list, gate_chi2: float, noise: MeasurementNoise = MeasurementN
             elif any(last_hid.get(x) == h and x not in matched_ids for x in before if x in state):
                 st["duplicates"] += 1
                 events.append((t, "duplicate", h, h, float("nan")))
-    d2 = np.array(d2_correct) if d2_correct else np.array([np.nan])
-    st.update(coverage=covered / total if total else float("nan"), d2_mean=float(np.nanmean(d2)),
-              d2_p95=float(np.nanpercentile(d2, 95)), gate_chi2=gate_chi2, events=events)
+    d2 = np.array(d2_correct)
+    st.update(coverage=covered / total if total else float("nan"), d2_mean=float(d2.mean()) if len(d2) else float("nan"),
+              d2_p95=float(np.percentile(d2, 95)) if len(d2) else float("nan"), gate_chi2=gate_chi2, events=events)
     return st

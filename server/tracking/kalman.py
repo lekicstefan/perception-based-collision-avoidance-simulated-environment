@@ -10,6 +10,11 @@ Model  constant velocity with white-noise acceleration (discrete white-noise acc
        sigma_a is the one tuning number of the process noise. The same value is used for every object (no object is treated
        differently by its appearance); it is tuned against the ground truth in step 6.9. dt is the REAL time between
        the two time stamps, not the nominal period, so the filter works at any processing rate and after missed scans.
+Bearing      the camera measures only a direction (step 6.6): theta = atan2(y - y_cam, x - x_cam) in the world frame, a scalar with
+       standard deviation sigma. This is nonlinear in the state, so the update is an extended Kalman step: the measurement
+       function is linearised at the predicted state, H_b = [-dy/r^2, dx/r^2, 0, 0] with dx, dy the offset of the track from the
+       camera and r its length. The innovation is the wrapped angle difference. A bearing corrects the position across the line
+       of sight and says nothing about the range; the time stamp rules below are the same as for a position.
 Measurement  z = [x, y] (a position, step 6.3 chooses which point of the cluster), H = [[I, 0]], covariance R given by the
        caller per measurement (server/tracking/noise.py makes it from the sensor noise and the range).
 
@@ -150,8 +155,8 @@ class ConstantVelocityFilter:
         p_new = 0.5 * (p_new + p_new.T)
         return x + k @ y, p_new, y, s
 
-    def update(self, z, r, t: float) -> UpdateResult:
-        """Process one position measurement z (2,) with covariance r (2, 2), captured at time t."""
+    def _apply_at(self, t: float, correct) -> UpdateResult:
+        """Run `correct(x, p) -> (x, p, y, s)` at the time stamp t with the time rules of the module docstring."""
         cfg = self.config
         dt = float(t) - self.t
         if dt > cfg.time_eps_s:
@@ -161,10 +166,45 @@ class ConstantVelocityFilter:
             reason = "same_time"
         elif -dt <= cfg.max_out_of_order_s:
             x_b, p_b = _propagate(self.x, self.P, dt, cfg.sigma_a)                  # back to the time of the measurement
-            x_b, p_b, y, s = self._correct(x_b, p_b, z, r)
+            x_b, p_b, y, s = correct(x_b, p_b)
             self.x, self.P = _propagate(x_b, p_b, -dt, cfg.sigma_a)                 # and forward again to the track time
             return UpdateResult(True, "out_of_order", dt, y, s, float(y @ np.linalg.solve(s, y)))
         else:
             return UpdateResult(False, "too_old", dt)
-        self.x, self.P, y, s = self._correct(self.x, self.P, z, r)
+        self.x, self.P, y, s = correct(self.x, self.P)
         return UpdateResult(True, reason, dt, y, s, float(y @ np.linalg.solve(s, y)))
+
+    def update(self, z, r, t: float) -> UpdateResult:
+        """Process one position measurement z (2,) with covariance r (2, 2), captured at time t."""
+        return self._apply_at(t, lambda x, p: self._correct(x, p, z, r))
+
+    # ---- bearing (camera) -----------------------------------------------------------------------------------------------
+    @staticmethod
+    def _bearing_model(x, cam_xy):
+        dx, dy = float(x[0] - cam_xy[0]), float(x[1] - cam_xy[1])
+        r2 = max(dx * dx + dy * dy, 1e-6)
+        return math.atan2(dy, dx), np.array([[-dy / r2, dx / r2, 0.0, 0.0]])
+
+    @staticmethod
+    def _correct_bearing(x, p, theta, sigma, cam_xy):
+        h, hb = ConstantVelocityFilter._bearing_model(x, cam_xy)
+        y = np.array([(float(theta) - h + math.pi) % (2.0 * math.pi) - math.pi])        # wrapped angle difference
+        r = np.array([[float(sigma) ** 2]])
+        s = hb @ p @ hb.T + r
+        k = p @ hb.T @ np.linalg.inv(s)
+        i_kh = np.eye(4) - k @ hb
+        p_new = i_kh @ p @ i_kh.T + k @ r @ k.T
+        return x + (k @ y), 0.5 * (p_new + p_new.T), y, s
+
+    def gate_distance2_bearing(self, theta: float, sigma: float, cam_xy, t: float) -> float:
+        """Squared normalised bearing innovation at time t (chi-square, 1 degree of freedom) without changing the track."""
+        x, p = self.predicted(t)
+        h, hb = self._bearing_model(x, cam_xy)
+        y = (float(theta) - h + math.pi) % (2.0 * math.pi) - math.pi
+        s = float((hb @ p @ hb.T)[0, 0]) + float(sigma) ** 2
+        return y * y / s
+
+    def update_bearing(self, theta: float, sigma: float, cam_xy, t: float) -> UpdateResult:
+        """Extended Kalman update with the world bearing `theta` (rad, from the x axis, positive to the left) of the object as seen
+        from the camera position `cam_xy` (world, metres), standard deviation `sigma` (rad), captured at time t."""
+        return self._apply_at(t, lambda x, p: self._correct_bearing(x, p, theta, sigma, cam_xy))
