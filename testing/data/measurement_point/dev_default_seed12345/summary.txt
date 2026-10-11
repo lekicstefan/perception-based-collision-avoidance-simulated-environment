@@ -1,0 +1,25 @@
+recording dev_default_seed12345, ground range_image + camera, sigma_a 1.5, burn-in 10, 583 hazard measurements
+
+per hazard and point (m/s unless noted; phantom_* for hazards that stand still)
+ id            label    point   n  true_speed  static  phantom_mean  phantom_rms  phantom_max  vel_rms  speed_rms  raw_rms  bias  offset_sd
+  1 crossing_vehicle  nearest 100        2.95   False           NaN          NaN          NaN    1.681      1.310    2.328 1.603      1.591
+  1 crossing_vehicle   centre 100        2.95   False           NaN          NaN          NaN    1.244      0.759    2.858 0.727      0.415
+  1 crossing_vehicle centroid 100        2.95   False           NaN          NaN          NaN    1.234      0.795    2.559 0.804      0.478
+  2       pedestrian  nearest  72        1.40   False           NaN          NaN          NaN    0.206      0.060    0.931 0.338      0.078
+  2       pedestrian   centre  72        1.40   False           NaN          NaN          NaN    0.103      0.058    0.375 0.175      0.044
+  2       pedestrian centroid  72        1.40   False           NaN          NaN          NaN    0.111      0.080    0.338 0.226      0.062
+  3            crate  nearest 137        0.00    True         0.815        1.130        3.493    1.130      1.130    3.718 0.538      0.264
+  3            crate   centre 137        0.00    True         0.051        0.134        1.017    0.134      0.134    0.879 0.036      0.062
+  3            crate centroid 137        0.00    True         0.031        0.051        0.360    0.051      0.051    0.743 0.481      0.062
+  4           person  nearest 104        0.00    True         0.275        0.340        0.802    0.340      0.340    1.954 0.290      0.163
+  4           person   centre 104        0.00    True         0.119        0.153        0.642    0.153      0.153    0.834 0.202      0.077
+  4           person centroid 104        0.00    True         0.101        0.134        0.491    0.134      0.134    0.567 0.238      0.070
+  5       parked_car  nearest 120        0.00    True         0.550        1.446        9.098    1.446      1.446    2.915 2.255      0.525
+  5       parked_car   centre 120        0.00    True         0.546        1.473        7.147    1.473      1.473    3.565 1.592      0.684
+  5       parked_car centroid 120        0.00    True         0.617        1.514        7.363    1.514      1.514    3.127 1.994      0.694
+
+per point (mean over the hazards that stand still / that move)
+   point  static_phantom_rms  static_phantom_max  static_offset_sd  mover_vel_rms  mover_raw_rms  bias_mean
+ nearest               0.972               9.098             0.317          0.943          1.629      1.005
+  centre               0.586               7.147             0.274          0.673          1.616      0.546
+centroid               0.566               7.363             0.275          0.673          1.448      0.749

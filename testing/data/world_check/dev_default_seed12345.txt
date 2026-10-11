@@ -1,0 +1,10 @@
+recording dev_default_seed12345, 211 scans, ground range_image
+ego: yaw from -0.0 to +0.0 deg   (the car does not turn: this recording cannot check the yaw sign)
+pose in the headers against ego.csv: position max 0.000 m, mean 0.000 m; yaw max 0.00 deg, mean 0.00 deg
+
+ id            label  speed  scans | spread std x/y (m):       nearest        centre      centroid | centre error (m): mean x, y, norm
+  1 crossing_vehicle    5.0    110 |                           0.08/ 8.36    0.22/ 9.36    0.15/ 9.29 |  -0.72  +0.08  0.73
+  2       pedestrian    1.4     82 |                           3.31/ 0.07    3.29/ 0.02    3.34/ 0.04 |  +0.17  +0.05  0.18
+  3            crate    0.0    147 |                           0.02/ 0.26    0.02/ 0.02    0.06/ 0.02 |  -0.03  -0.00  0.03
+  4           person    0.0    114 |                           0.03/ 0.16    0.05/ 0.05    0.04/ 0.06 |  +0.20  -0.03  0.21
+  5       parked_car    0.0    130 |                           0.47/ 0.18    0.64/ 0.18    0.64/ 0.21 |  -1.61  +0.05  1.61

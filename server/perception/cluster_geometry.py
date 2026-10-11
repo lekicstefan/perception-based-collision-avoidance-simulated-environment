@@ -28,6 +28,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from server.geometry.frames import vehicle_to_world
 from server.perception.ground import level_frame
 from server.perception.range_image import LidarGeometry, RangeImage
 from server.perception.segmentation import Cluster, Segmentation
@@ -51,9 +52,9 @@ class ClusterGeometry:
 
 
 def world_xy(xy, pose) -> np.ndarray:
-    """Vehicle-frame ground position -> start-frame position. pose = (x, y, z, yaw, pitch, roll), yaw positive to the left."""
-    c, s = math.cos(pose[3]), math.sin(pose[3])
-    return np.array([pose[0] + c * xy[0] - s * xy[1], pose[1] + s * xy[0] + c * xy[1]])
+    """Vehicle-frame ground position -> start-frame position (kept under this name; the one implementation is in
+    server/geometry/frames.py). pose = (x, y, z, yaw, pitch, roll), yaw positive to the left."""
+    return vehicle_to_world(xy, pose)
 
 
 class GeometryExtractor:
