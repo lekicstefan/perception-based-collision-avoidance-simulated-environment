@@ -16,7 +16,8 @@
 --out           output folder, default testing/data/fusion/<recording>
 
 Prints and writes summary.txt: per hazard the position error (also across and along the line of sight), the velocity error and
-the phantom speed of static hazards, without and with the camera; then how many camera updates were applied and the reasons
+the phantom speed of static hazards, without and with the camera; the static flag against the true motion (also while moving
+and how long it takes to clear when a hazard starts to move); and the filter against raw two-frame differencing; then how many camera updates were applied and the reasons
 for the others. Columns: top of testing/support/fusion_study.py.
 """
 import argparse
@@ -30,7 +31,7 @@ from server.perception.ground import GroundConfig, GroundMethod
 from server.perception.pipeline import PerceptionConfig
 from server.tracking.bearing import BearingConfig
 from testing.support.association_study import scan_measurements
-from testing.support.fusion_study import replay_fusion, summarise_fusion
+from testing.support.fusion_study import replay_fusion, summarise_ablation, summarise_fusion, summarise_outputs
 from testing.support.paths import DATA_DIR
 from testing.support.replay_scans import resolve
 
@@ -79,8 +80,14 @@ def main(argv=None):
     if len(table):
         table = table.sort_values(["id", "mode"])
     cam = runs["lidar+camera"]
+    motion = summarise_outputs(cam["rows"])
+    ablation = summarise_ablation(cam["rows"])
     text = (f"recording {folder.name}, {len(data)} scans, camera frames used {cam['camera_frames']} (every {args.camera_every}), "
             f"sigma {args.sigma_px} px, gate {args.gate}\n\n" + table.round(3).to_string(index=False)
+            + "\n\nmotion flags and outputs (lidar+camera): static_rate should be ~1 for hazards that stand still and ~0 for movers;"
+              " speed_out_rms is the speed after the static flag removed the phantom velocity\n" + motion.round(3).to_string(index=False)
+            + "\n\nfilter against raw two-frame differencing (lidar+camera): raw_over_filter = how many times larger the raw velocity error is;"
+              " raw_static_* = the naive flag 'raw speed under 0.5 m/s' (static_while_moving is the dangerous one)\n" + ablation.round(3).to_string(index=False)
             + f"\n\ncamera track-frames by result: {cam['reasons']}\nmean normalised innovation squared of the applied updates: "
               f"{cam['nis_mean']:.2f} (about 1 when sigma is right)\n")
     print(text)

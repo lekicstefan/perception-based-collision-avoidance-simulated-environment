@@ -56,7 +56,7 @@ def test_a_miss_between_hits_restarts_the_count_of_consecutive_hits():
 
 
 def test_a_confirmed_track_coasts_on_its_velocity_and_is_deleted_after_five_misses():
-    tr = Tracker()
+    tr = Tracker(TrackerConfig(track=TrackConfig(coast_bonus_misses=0)))                # the plain rule: K misses
     run(tr, [[(20.0 + 5.0 * DT * k, 0.0)] for k in range(30)])        # 5 m/s along x
     t = tr.tracks[0]
     assert t.filter.speed == pytest.approx(5.0, abs=0.7)
