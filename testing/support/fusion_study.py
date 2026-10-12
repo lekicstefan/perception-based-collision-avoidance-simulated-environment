@@ -28,7 +28,8 @@ from server.tracking.association import AssociationConfig
 from server.tracking.bearing import BearingConfig
 from server.tracking.kalman import FilterConfig
 from server.tracking.noise import MeasurementNoise
-from server.tracking.track import TrackState
+from server.tracking.outputs import OutputConfig
+from server.tracking.track import TrackConfig, TrackState
 from server.tracking.tracker import Tracker, TrackerConfig
 from testing.support.dev_recording import camera_path
 from testing.support.ground_truth import GroundTruth
@@ -53,14 +54,15 @@ def load_rgb(folder, frame: int):
     return None if bgr is None else cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
 
-def replay_fusion(folder, scans: list, use_camera: bool, gate_chi2: float = 9.21, sigma_a: float = 1.5, point: str = "centre",
+def replay_fusion(folder, scans: list, use_camera: bool, gate_chi2: float = 18.4, sigma_a: float = 1.4, point: str = "centre",
                   bearing: BearingConfig = BearingConfig(), camera_every: int = 1, burn_in: int = 10,
-                  noise: MeasurementNoise = MeasurementNoise(), on_camera=None) -> dict:
+                  noise: MeasurementNoise = MeasurementNoise(), on_camera=None, output: OutputConfig = OutputConfig(),
+                  track: TrackConfig = TrackConfig()) -> dict:
     folder = Path(folder)
     truth = GroundTruth.load(folder)
     camera = Calibration.from_json(folder / "calibration.json").camera
     tracker = Tracker(TrackerConfig(point=point, association=AssociationConfig(gate_chi2=gate_chi2),
-                                    filter=FilterConfig(sigma_a=sigma_a), bearing=bearing), noise)
+                                    filter=FilterConfig(sigma_a=sigma_a), bearing=bearing, output=output, track=track), noise)
     events = [(t, 0, i) for i, (t, _) in enumerate(scans)]
     cams = camera_timeline(folder, camera_every) if use_camera else []
     events += [(ct, 1, k) for k, (ct, _, _) in enumerate(cams)]

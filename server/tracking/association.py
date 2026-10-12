@@ -25,7 +25,7 @@ import numpy as np
 
 @dataclass(frozen=True)
 class AssociationConfig:
-    gate_chi2: float = 9.21             # squared Mahalanobis gate, chi-square 2 dof: 5.99 = 95 %, 9.21 = 99 %, 13.8 = 99.9 %
+    gate_chi2: float = 18.4             # squared Mahalanobis gate, chi-square 2 dof: 5.99 = 95 %, 9.21 = 99 %, 13.8 = 99.9 %, 18.4 = 99.99 % (tuned in 6.9, was 9.21)
 
 
 @dataclass

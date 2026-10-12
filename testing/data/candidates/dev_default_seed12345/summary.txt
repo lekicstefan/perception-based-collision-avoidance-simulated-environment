@@ -1,0 +1,45 @@
+candidates:
+  default: {'sigma_a': 1.5, 'sigma_extent': 0.7, 'gate': 9.21, 'known_sigma': 0.6, 'static_max_speed': 0.6, 'static_confirm_scans': 5, 'leave_chi2': 13.8}
+  best: {'sigma_a': 1.356, 'sigma_extent': 0.32, 'gate': 20.0, 'known_sigma': 1.47, 'static_max_speed': 0.73, 'static_confirm_scans': 3.0, 'leave_chi2': 10.2}
+  safe: {'sigma_a': 1.4, 'sigma_extent': 0.4, 'gate': 18.4, 'known_sigma': 0.9, 'static_max_speed': 0.6, 'static_confirm_scans': 4.0, 'leave_chi2': 10.5}
+
+                recording candidate  score  rows  vel_rms_moving  vel_rms_still  phantom_rms  static_while_moving_max  static_while_still_mean  leave_latency_max_s  pos_rms
+    dev_default_seed12345   default  2.591   499           1.443          0.245        0.245                    0.044                    0.746                  0.2    0.956
+    dev_default_seed12345      best  1.418   519           1.179          0.248        0.248                    0.000                    0.923                  0.0    0.953
+    dev_default_seed12345      safe  1.516   519           1.187          0.247        0.247                    0.000                    0.863                  0.0    0.954
+dev_lidar_clean_seed12345   default  1.937   504           1.376          0.249        0.249                    0.000                    0.709                  0.0    0.946
+dev_lidar_clean_seed12345      best  1.738   525           1.217          0.230        0.230                    0.020                    0.930                  0.1    0.939
+dev_lidar_clean_seed12345      safe  1.523   527           1.225          0.231        0.231                    0.000                    0.878                  0.0    0.943
+
+per hazard (static_while_moving must be ~0, static_while_still should be high):
+                recording candidate  id            label  true_speed  static_rate  static_while_moving  static_while_still  leave_latency_s
+    dev_default_seed12345   default   1 crossing_vehicle       2.500        0.333                0.044               0.622              0.2
+    dev_default_seed12345   default   2       pedestrian       1.400        0.000                0.000                 NaN              NaN
+    dev_default_seed12345   default   3            crate       0.000        0.962                  NaN               0.962              NaN
+    dev_default_seed12345   default   4           person       0.000        0.851                  NaN               0.851              NaN
+    dev_default_seed12345   default   5       parked_car       0.000        0.549                  NaN               0.549              NaN
+    dev_default_seed12345      best   1 crossing_vehicle       2.286        0.543                0.000               1.000              0.0
+    dev_default_seed12345      best   2       pedestrian       1.400        0.000                0.000                 NaN              NaN
+    dev_default_seed12345      best   3            crate       0.000        1.000                  NaN               1.000              NaN
+    dev_default_seed12345      best   4           person       0.000        0.926                  NaN               0.926              NaN
+    dev_default_seed12345      best   5       parked_car       0.000        0.765                  NaN               0.765              NaN
+    dev_default_seed12345      safe   1 crossing_vehicle       2.286        0.505                0.000               0.930              0.0
+    dev_default_seed12345      safe   2       pedestrian       1.400        0.000                0.000                 NaN              NaN
+    dev_default_seed12345      safe   3            crate       0.000        0.970                  NaN               0.970              NaN
+    dev_default_seed12345      safe   4           person       0.000        0.874                  NaN               0.874              NaN
+    dev_default_seed12345      safe   5       parked_car       0.000        0.678                  NaN               0.678              NaN
+dev_lidar_clean_seed12345   default   1 crossing_vehicle       2.667        0.200                0.000               0.429              0.0
+dev_lidar_clean_seed12345   default   2       pedestrian       1.400        0.000                0.000                 NaN              NaN
+dev_lidar_clean_seed12345   default   3            crate       0.000        0.962                  NaN               0.962              NaN
+dev_lidar_clean_seed12345   default   4           person       0.000        0.847                  NaN               0.847              NaN
+dev_lidar_clean_seed12345   default   5       parked_car       0.000        0.596                  NaN               0.596              NaN
+dev_lidar_clean_seed12345      best   1 crossing_vehicle       2.315        0.546                0.020               1.000              0.1
+dev_lidar_clean_seed12345      best   2       pedestrian       1.400        0.000                0.000                 NaN              NaN
+dev_lidar_clean_seed12345      best   3            crate       0.000        1.000                  NaN               1.000              NaN
+dev_lidar_clean_seed12345      best   4           person       0.000        0.929                  NaN               0.929              NaN
+dev_lidar_clean_seed12345      best   5       parked_car       0.000        0.789                  NaN               0.789              NaN
+dev_lidar_clean_seed12345      safe   1 crossing_vehicle       2.315        0.500                0.000               0.931              0.0
+dev_lidar_clean_seed12345      safe   2       pedestrian       1.400        0.000                0.000                 NaN              NaN
+dev_lidar_clean_seed12345      safe   3            crate       0.000        0.970                  NaN               0.970              NaN
+dev_lidar_clean_seed12345      safe   4           person       0.000        0.879                  NaN               0.879              NaN
+dev_lidar_clean_seed12345      safe   5       parked_car       0.000        0.733                  NaN               0.733              NaN

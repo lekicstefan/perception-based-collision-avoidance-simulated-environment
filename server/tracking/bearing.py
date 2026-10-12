@@ -37,14 +37,17 @@ class BearingConfig:
     sigma_px: float = 2.0               # pixel standard deviation of the middle of the two edges
     sigma_extra_rad: float = 0.002      # pose yaw and calibration error (added in quadrature)
     gate_chi2: float = 9.0              # 3 sigma, 1 degree of freedom
-    margin_frac: float = 0.3            # ROI margin: this fraction of the expected width ...
-    min_margin_px: float = 8.0          # ... but at least this many pixels
-    min_width_px: float = 4.0           # the two edges must be at least this far apart
-    width_ratio: tuple = (0.4, 3.0)     # the measured lateral width against the expected one: outside this it is implausible
+    margin_frac: float = 0.48           # (tuned in 6.9, was 0.3) ROI margin: this fraction of the expected width ...
+    min_margin_px: float = 4.5          # (tuned in 6.9, was 8) ... but at least this many pixels
+    min_width_px: float = 4.2           # (tuned in 6.9, was 4)  the two edges must be at least this far apart
+    width_ratio: tuple = (0.48, 3.2)    # (tuned in 6.9, was 0.4-3)  the measured lateral width against the expected one: outside this it is implausible
     min_range_m: float = 2.0            # closer than this (from the camera) no measurement
     use_color: bool = True              # edges of every colour channel too (an object and its background can share a gray level)
-    color_canny_factor: float = 0.6     # Canny thresholds of the colour channels: this fraction of the gray ones
-    edges: RefinementConfig = field(default_factory=RefinementConfig)
+    color_canny_factor: float = 0.39    # (tuned in 6.9, was 0.6)  Canny thresholds of the colour channels: this fraction of the gray ones
+    # edge rule tuned in 6.9 against the true silhouettes (was Canny 40/120, min_edge_frac 0.4, min_contrast 6, ambiguity 0.7):
+    # edges found 27 % -> 58 % of the attempts, rms error of the middle of the edges 8.5 -> 1.7 px
+    edges: RefinementConfig = field(default_factory=lambda: RefinementConfig(canny_low=41.0, canny_high=188.0, min_edge_frac=0.10,
+                                                                              min_contrast=6.5, ambiguity_ratio=0.68))
 
 
 @dataclass
