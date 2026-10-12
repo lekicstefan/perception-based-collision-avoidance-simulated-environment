@@ -7,10 +7,10 @@
 --ground        range_image (default) or height;   --scans A:B:S
 --camera-every  use every n-th camera frame (default 1: all)
 --sigma-px      pixel standard deviation of a bearing (default 2);   --gate  bearing gate, chi-square 1 dof (default 9)
---sigma-a       acceleration noise of the filter (default 1.5)
---margin-frac   ROI margin as a fraction of the expected width (default 0.3)
---min-edge-frac a column is an edge when edge pixels fill this fraction of the rows (default 0.4)
---canny-low/--canny-high  Canny thresholds (default 40 / 120);   --ambiguity  second-edge ratio that makes a side ambiguous (default 0.7)
+--sigma-a       acceleration noise of the filter (default 1.4)
+--margin-frac   ROI margin as a fraction of the expected width (default 0.48)
+--min-edge-frac a column is an edge when edge pixels fill this fraction of the rows (default 0.1)
+--canny-low/--canny-high  Canny thresholds (default 41 / 188);   --ambiguity  second-edge ratio that makes a side ambiguous (default 0.68)
 --no-color      edges of the gray image only (default: also of each colour channel)
 --burn-in       confirmed measurements of a hazard not counted at its start (default 10)
 --out           output folder, default testing/data/fusion/<recording>
@@ -26,7 +26,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from server.perception.camera_refinement import RefinementConfig
 from server.perception.ground import GroundConfig, GroundMethod
 from server.perception.pipeline import PerceptionConfig
 from server.tracking.bearing import BearingConfig
@@ -40,7 +39,7 @@ def bearing_config(args) -> BearingConfig:
     edge = {k: v for k, v in dict(canny_low=args.canny_low, canny_high=args.canny_high, min_edge_frac=args.min_edge_frac,
                                    ambiguity_ratio=args.ambiguity).items() if v is not None}
     top = {} if args.margin_frac is None else dict(margin_frac=args.margin_frac)
-    return BearingConfig(sigma_px=args.sigma_px, gate_chi2=args.gate, edges=replace(RefinementConfig(), **edge), use_color=not args.no_color, **top)
+    return BearingConfig(sigma_px=args.sigma_px, gate_chi2=args.gate, edges=replace(BearingConfig().edges, **edge), use_color=not args.no_color, **top)
 
 
 def main(argv=None):
@@ -51,7 +50,7 @@ def main(argv=None):
     ap.add_argument("--camera-every", type=int, default=1)
     ap.add_argument("--sigma-px", type=float, default=2.0)
     ap.add_argument("--gate", type=float, default=9.0)
-    ap.add_argument("--sigma-a", type=float, default=1.5)
+    ap.add_argument("--sigma-a", type=float, default=1.4)
     ap.add_argument("--margin-frac", type=float, default=None)
     ap.add_argument("--min-edge-frac", type=float, default=None)
     ap.add_argument("--canny-low", type=float, default=None)

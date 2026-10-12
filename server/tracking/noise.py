@@ -37,7 +37,7 @@ class MeasurementNoise:
     range_quantum_m: float = 0.01           # the range is sent in whole centimetres
     range_relative_sigma: float = 0.0       # extra range error as a fraction of the range
     azimuth_step_rad: float = math.radians(0.2)
-    sigma_extent_m: float = 0.7             # uncertainty of the unseen depth, added along the line of sight for the centre
+    sigma_extent_m: float = 0.4             # (tuned in 6.9, was 0.7) uncertainty of the unseen depth, added along the line of sight for the centre
     pose_position_sigma_m: float = 0.0      # pose noise of the car (position)
     pose_yaw_sigma_rad: float = 0.0         # pose noise of the car (yaw): moves a point at range r sideways by r sigma
     floor_m: float = 0.01                   # no standard deviation is smaller than this

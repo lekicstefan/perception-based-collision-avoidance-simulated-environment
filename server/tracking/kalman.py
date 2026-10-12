@@ -43,7 +43,7 @@ H = np.hstack([np.eye(2), np.zeros((2, 2))])
 
 @dataclass(frozen=True)
 class FilterConfig:
-    sigma_a: float = 1.5                    # m/s^2, standard deviation of the acceleration of an object
+    sigma_a: float = 1.4                    # m/s^2, standard deviation of the acceleration of an object (tuned in 6.9, was 1.5)
     initial_velocity_sigma: float = 10.0    # m/s, "large initial velocity uncertainty" of a new track
     max_out_of_order_s: float = 0.5         # an older measurement than this is rejected
     time_eps_s: float = 1e-6                # time stamps closer than this are the same instant

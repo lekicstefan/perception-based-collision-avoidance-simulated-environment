@@ -29,11 +29,11 @@ import numpy as np
 
 @dataclass(frozen=True)
 class OutputConfig:
-    known_sigma_mps: float = 0.6            # velocity standard deviation (largest axis) below which the velocity counts as known
+    known_sigma_mps: float = 0.9            # velocity standard deviation (largest axis) below which the velocity counts as known
     static_chi2: float = 5.99               # zero-velocity test to become static (95 %, 2 dof)
-    leave_chi2: float = 13.8                # zero-velocity test failed at this level: static is left (99.9 %)
+    leave_chi2: float = 10.5                # zero-velocity test failed at this level: static is left (99.9 %)
     static_max_speed_mps: float = 0.6       # a faster track is never static
-    static_confirm_scans: int = 5
+    static_confirm_scans: int = 4
     ellipse_chi2: float = 5.99              # confidence level of the position ellipse (95 %)
 
 
