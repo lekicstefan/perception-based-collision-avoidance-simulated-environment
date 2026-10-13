@@ -52,6 +52,14 @@ class TrackConfig:
     duplicate_max_dv_mps: float = 1.0   # ... and velocities closer than this
 
 
+def surface_offsets(w: WorldCluster, position) -> np.ndarray:
+    """(5, 2): the four corners of the visible box of a cluster and its nearest point, as offsets from the tracked point `position`.
+    The risk stage moves these points with the track (also while it coasts) to get the surface that can be hit, which is not the
+    tracked centre (that is biased along the line of sight, phase 6)."""
+    pts = np.vstack([np.asarray(w.corners_xy, dtype=float).reshape(-1, 2), np.asarray(w.nearest_xy, dtype=float)[None]])
+    return pts - np.asarray(position, dtype=float)
+
+
 class Track:
     def __init__(self, track_id: int, flt: ConstantVelocityFilter, w: WorldCluster, config: TrackConfig = TrackConfig()):
         self.id = track_id
@@ -73,6 +81,7 @@ class Track:
         self.shared = 0                 # consecutive scans in which another track's cluster also fits this track (merge test)
         self.last_hit_t = flt.t
         self.last_cluster = w
+        self.surface_offsets = surface_offsets(w, flt.position)      # the visible surface relative to the tracked point (see above)
         self.max_width_m = w.width_m
         self.max_depth_m = w.depth_m
         self.max_height_m = w.height_m
@@ -94,6 +103,7 @@ class Track:
         self.history.append(True)
         self.last_hit_t = t
         self.last_cluster = w
+        self.surface_offsets = surface_offsets(w, self.filter.position)
         self.max_width_m = max(self.max_width_m, w.width_m)
         self.max_depth_m = max(self.max_depth_m, w.depth_m)
         self.max_height_m = max(self.max_height_m, w.height_m)
@@ -109,6 +119,8 @@ class Track:
         that the filter does not read it as motion. The previous measurement of the raw baseline moves with it."""
         delta = np.asarray(delta, dtype=float)
         self.filter.x[:2] += delta
+        if getattr(self, "surface_offsets", None) is not None:
+            self.surface_offsets = self.surface_offsets - delta            # the surface stays where it is, only the point moved
         pos, t = self._prev_measurement
         self._prev_measurement = (pos + delta, t)
 

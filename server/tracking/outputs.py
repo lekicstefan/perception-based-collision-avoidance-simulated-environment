@@ -61,6 +61,7 @@ class TrackOutput:
     hit_ratio: float
     camera_hits: int
     existence: float
+    surface_offsets: np.ndarray | None = None   # (5, 2): corners of the visible box and nearest point, relative to `position` (world axes)
 
 
 def velocity_stats(v, p_vv):
@@ -112,4 +113,5 @@ def track_output(track, cfg: OutputConfig = OutputConfig()) -> TrackOutput:
         heading=None if track.static else f.heading, heading_sigma=None if track.static else heading_sigma,
         pos_cov=f.P[:2, :2].copy(), ellipse=(major, minor, float(math.atan2(vec[1, 1], vec[0, 1]))), cov=f.P.copy(),
         velocity_known=known, static=track.static, age_scans=track.age_scans, age_s=f.t - track.born_t, hits=track.hits,
-        misses=track.misses, hit_ratio=track.hit_ratio, camera_hits=track.camera_hits, existence=track.hit_ratio)
+        misses=track.misses, hit_ratio=track.hit_ratio, camera_hits=track.camera_hits, existence=track.hit_ratio,
+        surface_offsets=getattr(track, "surface_offsets", None))

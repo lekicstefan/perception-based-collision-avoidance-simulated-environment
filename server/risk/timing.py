@@ -67,6 +67,7 @@ class PredictedTrack:
     state: str
     existence: float
     age_s: float
+    surface: np.ndarray | None = None   # (5, 2) corners of the visible box and nearest point relative to `position` (vehicle axes), or None
 
     @property
     def pos_cov(self) -> np.ndarray:
@@ -89,7 +90,8 @@ def predict_track(out, t_effect: float, pose_data, sigma_a: float) -> PredictedT
     b[:2, :2] = b[2:, 2:] = r.T
     pos = r.T @ (x[:2] - np.array([pose_data[0], pose_data[1]]))
     return PredictedTrack(id=out.id, t=float(t_effect), position=pos, velocity=r.T @ x[2:], cov=b @ p @ b.T, static=bool(out.static),
-                          velocity_known=bool(out.velocity_known), state=out.state, existence=float(out.existence), age_s=float(out.age_s))
+                          velocity_known=bool(out.velocity_known), state=out.state, existence=float(out.existence), age_s=float(out.age_s),
+                          surface=None if getattr(out, "surface_offsets", None) is None else np.asarray(out.surface_offsets, dtype=float) @ r)
 
 
 def ego_travel(speed_mps: float, dt: float) -> float:
