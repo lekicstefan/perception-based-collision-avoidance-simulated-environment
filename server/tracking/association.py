@@ -81,20 +81,23 @@ def hungarian(cost) -> list:
     return sorted((int(p[j]) - 1, j - 1) for j in range(1, m + 1) if p[j] != 0)
 
 
-def mahalanobis_matrix(filters, measurements) -> np.ndarray:
+def mahalanobis_matrix(filters, measurements, pair_measurement=None) -> np.ndarray:
     """(tracks, measurements) squared Mahalanobis distances. A measurement is (z, R, t) as `measurement_of` returns it; every
-    track is predicted to the time of the measurement."""
+    track is predicted to the time of the measurement. With `pair_measurement(i, j)` the measurement of cluster j as seen by
+    track i is used instead (the size memory of a track changes its centre, step 6.11)."""
     d2 = np.empty((len(filters), len(measurements)))
     for i, f in enumerate(filters):
-        for j, (z, r, t) in enumerate(measurements):
+        for j in range(len(measurements)):
+            z, r, t = measurements[j] if pair_measurement is None else pair_measurement(i, j)
             d2[i, j] = f.gate_distance2(z, r, t)
     return d2
 
 
-def associate(filters, measurements, config: AssociationConfig = AssociationConfig()) -> Association:
-    """Gate and assign. `filters`: ConstantVelocityFilter objects; `measurements`: (z, R, t) tuples."""
+def associate(filters, measurements, config: AssociationConfig = AssociationConfig(), pair_measurement=None) -> Association:
+    """Gate and assign. `filters`: ConstantVelocityFilter objects; `measurements`: (z, R, t) tuples; `pair_measurement`: optional
+    function (track index, measurement index) -> (z, R, t), see `mahalanobis_matrix`."""
     n, m = len(filters), len(measurements)
-    d2 = mahalanobis_matrix(filters, measurements)
+    d2 = mahalanobis_matrix(filters, measurements, pair_measurement)
     if n == 0 or m == 0:
         return Association([], list(range(n)), list(range(m)), d2)
     possible = d2 <= config.gate_chi2

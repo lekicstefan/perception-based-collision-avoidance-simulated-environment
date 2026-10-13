@@ -12,6 +12,7 @@
 --min-edge-frac a column is an edge when edge pixels fill this fraction of the rows (default 0.1)
 --canny-low/--canny-high  Canny thresholds (default 41 / 188);   --ambiguity  second-edge ratio that makes a side ambiguous (default 0.68)
 --no-color      edges of the gray image only (default: also of each colour channel)
+--no-extent     without the size memory of the tracks (step 6.11), for the comparison; use --out to keep both results
 --burn-in       confirmed measurements of a hazard not counted at its start (default 10)
 --out           output folder, default testing/data/fusion/<recording>
 
@@ -29,6 +30,7 @@ import pandas as pd
 from server.perception.ground import GroundConfig, GroundMethod
 from server.perception.pipeline import PerceptionConfig
 from server.tracking.bearing import BearingConfig
+from server.tracking.extent import ExtentConfig
 from testing.support.association_study import scan_measurements
 from testing.support.fusion_study import replay_fusion, summarise_ablation, summarise_fusion, summarise_outputs
 from testing.support.paths import DATA_DIR
@@ -57,6 +59,7 @@ def main(argv=None):
     ap.add_argument("--canny-high", type=float, default=None)
     ap.add_argument("--ambiguity", type=float, default=None)
     ap.add_argument("--no-color", action="store_true")
+    ap.add_argument("--no-extent", action="store_true")
     ap.add_argument("--burn-in", type=int, default=10)
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
@@ -68,7 +71,7 @@ def main(argv=None):
     data = scan_measurements(folder, PerceptionConfig(ground=GroundConfig(method=GroundMethod(args.ground))), scans, use_camera=True)
     bcfg = bearing_config(args)
     runs = {name: replay_fusion(folder, data, use_cam, sigma_a=args.sigma_a, bearing=bcfg, camera_every=args.camera_every,
-                              burn_in=args.burn_in)
+                              burn_in=args.burn_in, extent=ExtentConfig(enabled=not args.no_extent))
             for name, use_cam in (("lidar", False), ("lidar+camera", True))}
     tables = []
     for name, r in runs.items():
@@ -82,7 +85,7 @@ def main(argv=None):
     motion = summarise_outputs(cam["rows"])
     ablation = summarise_ablation(cam["rows"])
     text = (f"recording {folder.name}, {len(data)} scans, camera frames used {cam['camera_frames']} (every {args.camera_every}), "
-            f"sigma {args.sigma_px} px, gate {args.gate}\n\n" + table.round(3).to_string(index=False)
+            f"sigma {args.sigma_px} px, gate {args.gate}, size memory {'off' if args.no_extent else 'on'}\n\n" + table.round(3).to_string(index=False)
             + "\n\nmotion flags and outputs (lidar+camera): static_rate should be ~1 for hazards that stand still and ~0 for movers;"
               " speed_out_rms is the speed after the static flag removed the phantom velocity\n" + motion.round(3).to_string(index=False)
             + "\n\nfilter against raw two-frame differencing (lidar+camera): raw_over_filter = how many times larger the raw velocity error is;"

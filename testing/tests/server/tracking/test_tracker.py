@@ -13,10 +13,10 @@ DT = 0.1
 
 
 def wc(x, y, t, width=1.0, depth=1.0):
-    """A cluster whose corrected centre is (x, y), seen from a sensor at the origin."""
+    """A cluster whose corrected centre is (x, y), seen from a sensor at the origin (its visible box is width x depth around it)."""
     c = np.array([x, y], dtype=float)
     return WorldCluster(t=t, pose=(0.0,) * 6, label=0, n_cells=50, nearest_xy=c - [0.5, 0.0], centre_xy=c, centroid_xy=c,
-                        sensor_xy=np.zeros(2), bearing=math.atan2(y, x), range_m=math.hypot(x - 0.5, y), corners_xy=np.zeros((4, 2)),
+                        sensor_xy=np.zeros(2), bearing=math.atan2(y, x), range_m=math.hypot(x - 0.5, y), corners_xy=c + np.array([[-depth / 2, -width / 2], [depth / 2, -width / 2], [depth / 2, width / 2], [-depth / 2, width / 2]]),
                         width_m=width, depth_m=depth, height_m=1.5, top_m=1.5)
 
 
