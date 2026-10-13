@@ -2,7 +2,8 @@
 
 `Tracker.step(clusters, t)` takes the world clusters of one scan (`clusters_to_world`) and does, in this order:
 
-  1. measurement   every cluster becomes (z, R, t) with the chosen point (default: the corrected centre, step 6.3)
+  1. measurement   every cluster becomes (z, R, t) with the chosen point (default: the corrected centre, step 6.3). With the size
+                   memory (step 6.11) the centre is completed to the extent the track remembers, so it is measured per track
   2. association   gate and Hungarian assignment (step 6.4) against the existing tracks
   3. update        assigned tracks are updated with their measurement (a hit); a tentative track with `confirm_hits`
                    consecutive hits is confirmed
@@ -23,7 +24,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from server.tracking.association import AssociationConfig, associate
+from server.tracking.extent import ExtentConfig, centre_with_extent, grow, hull, initial_extent, with_centre
 from server.tracking.bearing import BearingConfig, CameraResult, measure_bearing, prepare_frame
 from server.tracking.kalman import ConstantVelocityFilter, FilterConfig
 from server.tracking.measurement import WorldCluster
@@ -40,6 +44,7 @@ class TrackerConfig:
     track: TrackConfig = field(default_factory=TrackConfig)
     bearing: BearingConfig = field(default_factory=BearingConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
+    extent: ExtentConfig = field(default_factory=ExtentConfig)        # size memory of the tracks (step 6.11; only for point 'centre')
 
 
 @dataclass
@@ -58,6 +63,7 @@ class Tracker:
         self.noise = noise
         self.tracks: list[Track] = []
         self._next_id = 1
+        self._dups: dict = {}                                    # (id a, id b) -> scans in which the two tracks were at the same place
 
     @property
     def reported(self) -> list:
@@ -68,11 +74,33 @@ class Tracker:
         cfg = self.config
         out = StepResult(t)
         meas = [measurement_of(w, self.noise, cfg.point) for w in clusters]
-        res = associate([tr.filter for tr in self.tracks], meas, cfg.association)
+        ecfg = cfg.extent
+        use_extent = ecfg.enabled and cfg.point == "centre"
+        pair_cache = {}
+
+        def pair(i, j):                                                  # cluster j as track i sees it (its remembered extent)
+            if (i, j) not in pair_cache:
+                ext = self.tracks[i].eff_extent
+                ext = initial_extent(clusters[j], ecfg) if ext is None else ext
+                pair_cache[(i, j)] = measurement_of(with_centre(clusters[j], ext, ecfg), self.noise, cfg.point)
+            return pair_cache[(i, j)]
+
+        res = associate([tr.filter for tr in self.tracks], meas, cfg.association, pair if use_extent else None)
         owner = {}                                                       # cluster index -> track index that got it
         for i, j in res.matches:
             tr = self.tracks[i]
             z, r, mt = meas[j]
+            if use_extent:
+                w = clusters[j]
+                old = initial_extent(w, ecfg) if tr.eff_extent is None else tr.eff_extent        # the extent the track's point is defined with now
+                lo, hi = hull(w)
+                tr.recent_hulls = (tr.recent_hulls + [hi - lo])[-max(ecfg.persist_scans, 1):]
+                mem = grow(initial_extent(w, ecfg) if tr.extent is None else tr.extent, w, ecfg, tr.recent_hulls)
+                new = np.minimum(np.maximum(mem, hi - lo), ecfg.max_extent_m)                     # memory, but never less than what is visible now
+                if not np.array_equal(new, old):                          # a new definition of the point: move the track, not the filter's belief of motion
+                    tr.rereference(centre_with_extent(w, new, ecfg) - centre_with_extent(w, old, ecfg))
+                tr.extent, tr.eff_extent = mem, new
+                z, r, mt = measurement_of(with_centre(w, new, ecfg), self.noise, cfg.point)
             if tr.hit(clusters[j], z, r, mt):
                 out.confirmed.append(tr.id)
             out.matches.append((tr.id, j, float(res.d2[i, j])))
@@ -92,15 +120,57 @@ class Tracker:
                     dead.add(i)
                     out.merged.append((tr.id, keep.id))
         self.tracks = [tr for i, tr in enumerate(self.tracks) if i not in dead]
+        self._merge_duplicates(out)
         for j in res.unmatched_measurements:
             z, r, mt = meas[j]
+            ext = initial_extent(clusters[j], ecfg) if use_extent else None
+            if use_extent:
+                z, r, mt = measurement_of(with_centre(clusters[j], ext, ecfg), self.noise, cfg.point)
             tr = Track(self._next_id, ConstantVelocityFilter.initialise(z, r, mt, cfg.filter), clusters[j], cfg.track)
+            tr.extent = tr.eff_extent = ext
+            tr.recent_hulls = [] if ext is None else [ext.copy()]
             self._next_id += 1
             self.tracks.append(tr)
             out.births.append((tr.id, j))
         for tr in self.tracks:
             update_motion_state(tr, cfg.output)
         return out
+
+    def _merge_duplicates(self, out: StepResult) -> None:
+        """Two tracks of one object (step 6.11): the same cluster goes alternately to the one and to the other, so the track without
+        a measurement never stays unexplained for `merge_scans` scans in a row and the merge test of step 5 never fires. Here the
+        tracks are compared with each other: at the same place (closer than `duplicate_max_dist_m`, within `duplicate_chi2` of
+        their position covariances, similar velocity) in `duplicate_scans` scans, not necessarily in a row, they are one object
+        and the one with fewer hits is deleted. The distance limit keeps two objects that touch (a person at the side of a car)
+        apart: their centres are further apart than this."""
+        cfg = self.config.track
+        if cfg.duplicate_scans <= 0:
+            return
+        alive = {tr.id for tr in self.tracks}
+        self._dups = {k: v for k, v in self._dups.items() if k[0] in alive and k[1] in alive}
+        dead = set()
+        for a in range(len(self.tracks)):
+            for b in range(a + 1, len(self.tracks)):
+                ta, tb = self.tracks[a], self.tracks[b]
+                key = (min(ta.id, tb.id), max(ta.id, tb.id))
+                if ta.id in dead or tb.id in dead:
+                    continue
+                d = ta.filter.x[:2] - tb.filter.x[:2]
+                dist = float(np.hypot(*d))
+                same = False
+                if dist < cfg.duplicate_max_dist_m and np.hypot(*(ta.filter.x[2:4] - tb.filter.x[2:4])) < cfg.duplicate_max_dv_mps:
+                    S = ta.filter.P[:2, :2] + tb.filter.P[:2, :2]
+                    same = float(d @ np.linalg.solve(S, d)) < cfg.duplicate_chi2
+                n = self._dups.get(key, 0)
+                n = n + 1 if same else max(n - 1, 0)
+                self._dups[key] = n
+                if n >= cfg.duplicate_scans:
+                    drop = ta if (ta.hits, -ta.id) < (tb.hits, -tb.id) else tb
+                    keep = tb if drop is ta else ta
+                    dead.add(drop.id)
+                    out.merged.append((drop.id, keep.id))
+        if dead:
+            self.tracks = [tr for tr in self.tracks if tr.id not in dead]
 
     def outputs(self) -> list:
         """The derived outputs (outputs.py) of the confirmed and coasting tracks."""

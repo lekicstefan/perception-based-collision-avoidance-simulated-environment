@@ -4,6 +4,7 @@
   python -m testing.tools.perception.render_scan --recording dev_default_seed12345 --frame 0
   python -m testing.tools.perception.render_scan --recording dev_default_seed12345 --frames 0:100:10 --camera
   python -m testing.tools.perception.render_scan --recording dev_default_seed12345 --frame 5 --ground height
+  python -m testing.tools.perception.render_scan --recording dev_default_seed12345 --frames 100:140:1 --tracks --truth --focus 5 --gif 5
 
 --recording    a folder name inside testing/data/recordings, or a path
 --frame N      scan number (index in lidar.bin);  --frames A:B:S  a range with step (B is not included)
@@ -14,6 +15,12 @@
 --view-range   depth of the top view in metres (default 50)
 --focus ID     with --truth: top view zoomed on this hazard (id as in hazards.csv), a square of 2 x --focus-radius metres
 --focus-radius half side of the zoomed window in metres (default 8)
+--tracks       (step 6.11) run the tracker over the scans from the first one up to the last picked and draw it on the top
+               view: tracks (gold = confirmed, grey = tentative, red = coasting; a square marker = flagged static), velocity
+               arrow, 95 % position ellipse, the extent the track remembers as a box, a white line from every cluster to its
+               track, and the births, merges and deletions of the scan; with the camera bearing updates (their search regions
+               and the edges found) in the camera panel
+--lidar-only   with --tracks: no camera bearing updates and no camera panel
 --gif FPS      also make a gif of the written images
 --out          output folder, default testing/data/scan_views
 Every image has the range image on top (each segment in its own colour, closer = lighter and paler, farther = darker;
@@ -31,7 +38,7 @@ from server.geometry.calibration import Calibration
 from server.perception.camera_refinement import RefinementConfig
 from server.perception.ground import GroundConfig, GroundMethod
 from server.perception.pipeline import PerceptionConfig, PerceptionPipeline
-from testing.support import scan_view
+from testing.support import scan_view, track_view
 from testing.support.dev_recording import load_lidar
 from testing.support.ground_truth import GroundTruth
 from testing.support.paths import DATA_DIR
@@ -94,6 +101,51 @@ def write(path: Path, result, calib, geo, rgb, truths=None, view_range_m: float 
     print("wrote", path)
 
 
+def render_with_tracks(args, folder, calib, scans, picks, truth, out: Path) -> list:
+    """The tracker runs over every scan from the first to the last picked (it needs the history); pictures only of the picked ones."""
+    from server.tracking.measurement import clusters_to_world
+    from server.tracking.tracker import Tracker
+    from testing.support.camera_roi_view import draw_rois
+    from testing.support.fusion_study import camera_timeline, load_rgb
+    pipe = make_pipeline(calib, args)
+    tracker = Tracker()
+    sensor_xy = pipe.builder.geometry.origin[:2]
+    cams = [] if args.lidar_only else camera_timeline(folder)
+    ci, last_cam, wanted, paths = 0, None, set(picks), []
+    for k in range(0, max(picks) + 1):
+        img = pipe.builder.ingest(lidar_message(scans[k]))
+        while ci < len(cams) and cams[ci][0] < img.t:                       # camera frames captured before this scan, in time order
+            ct, fr, pose = cams[ci]
+            rgb = load_rgb(folder, fr)
+            if rgb is not None:
+                diag = []
+                last_cam = (ct, rgb, diag, tracker.step_camera(rgb, pose, ct, calib.camera, diag))
+            ci += 1
+        result = pipe.process(img, None, None)
+        world = clusters_to_world(result.clusters, img, sensor_xy)
+        res = tracker.step(world, img.t)
+        if k not in wanted:
+            continue
+        tracks, links, head = track_view.overlay(tracker, res, world, img.pose)
+        objs = truth.objects_at(img.t) if truth else None
+        focus = None
+        if args.focus is not None and objs:
+            hit = [o for o in objs if o.id == args.focus]
+            focus = (float(hit[0].centre[0]), float(hit[0].centre[1]), args.focus_radius) if hit else None
+        panels = [scan_view.range_panel(result, calib),
+                  scan_view.top_view(result, calib, pipe.builder.geometry, view_range_m=args.view_range, truths=objs, focus=focus,
+                                     tracks=tracks, links=links, headline=head)]
+        if last_cam is not None:
+            ct, rgb, diag, results = last_cam
+            frame = draw_rois(rgb, diag, results, tracker.config.bearing, ct)
+            panels.append(frame[:, :rgb.shape[1]])                          # the frame with the search regions, not the edge map
+        path = out / f"{folder.name}_tracks{k:05d}.png"
+        scan_view.save_rgb(path, scan_view.compose(panels))
+        print("wrote", path)
+        paths.append(path)
+    return paths
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--demo", action="store_true")
@@ -108,6 +160,8 @@ def main():
     ap.add_argument("--focus", type=int, default=None)
     ap.add_argument("--focus-radius", type=float, default=8.0)
     ap.add_argument("--view-range", type=float, default=50.0)
+    ap.add_argument("--tracks", action="store_true")
+    ap.add_argument("--lidar-only", action="store_true")
     ap.add_argument("--gif", type=int, default=None)
     args = ap.parse_args()
     out = Path(args.out)
@@ -124,12 +178,17 @@ def main():
         picks = range(a, min(b, len(scans)), s)
     else:
         picks = [args.frame or 0]
-    pipe = make_pipeline(calib, args)
-    image_paths = []
-    frames = CameraFrames(folder) if args.camera else None
     truth = GroundTruth.load(folder) if args.truth and GroundTruth.exists(folder) else None
     if args.truth and truth is None:
         print("no ground-truth files in", folder, "- drawing without truth")
+    if args.tracks:
+        image_paths = render_with_tracks(args, folder, calib, scans, list(picks), truth, out)
+        if args.gif is not None and args.gif > 0 and image_paths:
+            make_gif(image_paths, out / f"{folder.name}_tracks.gif", args.gif)
+        return
+    pipe = make_pipeline(calib, args)
+    image_paths = []
+    frames = CameraFrames(folder) if args.camera else None
     for k in picks:
         rec = scans[k]
         img = pipe.builder.ingest(lidar_message(rec))

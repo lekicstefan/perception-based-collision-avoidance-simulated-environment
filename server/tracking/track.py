@@ -12,7 +12,8 @@ that). Only confirmed and coasting tracks are reported to the risk stage (confir
 the car). A coasting track keeps predicting with its velocity; its covariance grows with every miss, so the gate grows too.
 How long a coasting track lives: K misses, more (`coast_bonus_misses`) for an old track with a high hit ratio, and as long
 as a camera bearing keeps arriving (`camera_keep_s`) up to `hard_miss_factor` x K misses.
-The track also remembers the largest extent it has been seen with (a partial view of a big object is then recognisable).
+The track also remembers the largest extent it has been seen with (`extent`, step 6.11): the tracked centre then does not move
+when only a part of a big object is in view.
 """
 from __future__ import annotations
 
@@ -45,6 +46,10 @@ class TrackConfig:
     coast_bonus_min_age: int = 20       # ... and it is at least this many scans old (0 bonus misses: the plain rule of K)
     camera_keep_s: float = 1.0          # a coasting track with a camera bearing this recently is not deleted for its misses ...
     hard_miss_factor: int = 3           # ... until it has missed this many times K
+    duplicate_scans: int = 3            # two tracks at the same place (below) in this many scans, not necessarily in a row, are one (0: off)
+    duplicate_max_dist_m: float = 0.6   # ... same place: positions closer than this ...
+    duplicate_chi2: float = 9.21        # ... and within this chi-square (2 dof) of their position covariances ...
+    duplicate_max_dv_mps: float = 1.0   # ... and velocities closer than this
 
 
 class Track:
@@ -71,6 +76,9 @@ class Track:
         self.max_width_m = w.width_m
         self.max_depth_m = w.depth_m
         self.max_height_m = w.height_m
+        self.extent = None              # remembered size per world axis (extent.py, set by the tracker)
+        self.eff_extent = None          # extent the tracked point is defined with now: the memory, or the visible hull when larger
+        self.recent_hulls = []          # hull sizes of the latest clusters (extent.grow: persistence of a larger size)
 
     # ---- events -----------------------------------------------------------------------------------------------------
     def hit(self, w: WorldCluster, z, r, t: float) -> bool:
@@ -95,6 +103,14 @@ class Track:
         elif self.state == TrackState.TENTATIVE and self.consecutive_hits >= self.config.confirm_hits:
             self.state = TrackState.CONFIRMED
         return was == TrackState.TENTATIVE and self.state == TrackState.CONFIRMED
+
+    def rereference(self, delta) -> None:
+        """The tracked point is defined differently (the remembered extent grew, extent.py): move the track by delta (2,) so
+        that the filter does not read it as motion. The previous measurement of the raw baseline moves with it."""
+        delta = np.asarray(delta, dtype=float)
+        self.filter.x[:2] += delta
+        pos, t = self._prev_measurement
+        self._prev_measurement = (pos + delta, t)
 
     def camera_hit(self, t: float) -> None:
         self.camera_hits += 1

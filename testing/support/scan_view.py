@@ -7,6 +7,10 @@
                 (white cross), the corrected box centre (yellow ring) and the centroid (orange diamond) of every cluster, its
                 bounding box (thin grey), and with ground truth the true footprint and centre of every hazard (green).
   camera panel  the camera frame closest in time with the projected LiDAR extent (blue) and the refined extent (green).
+  tracks        (step 6.11, from testing/support/track_view.py) the tracker on top of the top view: every track with its id,
+                state (confirmed gold, tentative grey, coasting red), a square marker when it is flagged static, the velocity
+                arrow (one second ahead), the 95 % position ellipse, the extent it remembers as a box, and a white line from
+                every cluster to the track it was given to.
 """
 from __future__ import annotations
 
@@ -103,9 +107,10 @@ def range_panel(result: PerceptionResult, calibration, sx: int = 3, sy: int = 14
 
 
 def top_view(result: PerceptionResult, calibration, geometry, view_range_m: float = 50.0, half_width_m: float = 25.0,
-             px_per_m: float = 10.0, truths=None, focus=None) -> np.ndarray:
+             px_per_m: float = 10.0, truths=None, focus=None, tracks=None, links=None, headline=None) -> np.ndarray:
     """`truths`: TruthObjects (vehicle frame, testing/support/ground_truth.py) to draw as green footprints.
-    `focus` = (x, y, half_m): a square window of 2 * half_m metres centred on that vehicle-frame point instead of the road."""
+    `focus` = (x, y, half_m): a square window of 2 * half_m metres centred on that vehicle-frame point instead of the road.
+    `tracks`, `links`, `headline`: the tracker overlay (track_view.overlay), all in the vehicle frame."""
     if focus is None:
         h, w = int(view_range_m * px_per_m) + 30, int(2 * half_width_m * px_per_m)
     else:
@@ -152,8 +157,36 @@ def top_view(result: PerceptionResult, calibration, geometry, view_range_m: floa
         mx, my = pix(g.centroid_xy[0], g.centroid_xy[1])
         cv2.drawMarker(canvas, (mx, my), (255, 150, 40), cv2.MARKER_DIAMOND, 9, 1, cv2.LINE_AA)
         _text(canvas, f"#{g.label} n{g.n_cells}", (cx + 9, cy - 6), 0.4)
-    _text(canvas, "top view: nearest +, centre o, centroid <>, box grey" + (", truth green" if truths else ""), (6, 14), 0.42)
+    if tracks is not None:
+        draw_tracks(canvas, pix, tracks, links or [], px_per_m)
+    _text(canvas, "top view: nearest +, centre o, centroid <>, box grey" + (", truth green" if truths else "")
+          + (", tracks gold/grey/red" if tracks is not None else ""), (6, 14), 0.42)
+    if headline:
+        _text(canvas, headline, (6, 28), 0.4, (255, 215, 0))
     return canvas
+
+
+TRACK_COLOUR = {"confirmed": (255, 215, 0), "tentative": (150, 150, 150), "coasting": (255, 110, 110)}
+
+
+def draw_tracks(canvas, pix, tracks: list, links: list, px_per_m: float, horizon_s: float = 1.0) -> None:
+    """Tracker overlay of the top view. `tracks`: dicts (id, state, static, pos (2), vel (2), ellipse (n, 2), box (4, 2) or None, label);
+    `links`: [((x, y) of a cluster, (x, y) of its track)]; all in the vehicle frame."""
+    for a, b in links:
+        cv2.line(canvas, pix(*a), pix(*b), (235, 235, 235), 1, cv2.LINE_AA)
+    for tr in tracks:
+        col = TRACK_COLOUR.get(tr["state"], (200, 200, 200))
+        if tr.get("box") is not None:
+            cv2.polylines(canvas, [np.array([pix(*c) for c in tr["box"]], dtype=np.int32)], True, col, 1, cv2.LINE_AA)
+        cv2.polylines(canvas, [np.array([pix(*c) for c in tr["ellipse"]], dtype=np.int32)], True, col, 1, cv2.LINE_AA)
+        px, py = pix(*tr["pos"])
+        if tr["static"]:
+            cv2.drawMarker(canvas, (px, py), col, cv2.MARKER_SQUARE, 10, 2, cv2.LINE_AA)
+        else:
+            cv2.circle(canvas, (px, py), 4, col, -1, cv2.LINE_AA)
+            tip = pix(tr["pos"][0] + tr["vel"][0] * horizon_s, tr["pos"][1] + tr["vel"][1] * horizon_s)
+            cv2.arrowedLine(canvas, (px, py), tip, col, 2, cv2.LINE_AA, tipLength=0.3)
+        _text(canvas, tr["label"], (px + 8, py + 14), 0.4, col)
 
 
 def camera_panel(result: PerceptionResult, rgb: np.ndarray) -> np.ndarray:

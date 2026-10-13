@@ -28,6 +28,7 @@ from server.tracking.association import AssociationConfig
 from server.tracking.bearing import BearingConfig
 from server.tracking.kalman import FilterConfig
 from server.tracking.noise import MeasurementNoise
+from server.tracking.extent import ExtentConfig
 from server.tracking.outputs import OutputConfig
 from server.tracking.track import TrackConfig, TrackState
 from server.tracking.tracker import Tracker, TrackerConfig
@@ -57,12 +58,12 @@ def load_rgb(folder, frame: int):
 def replay_fusion(folder, scans: list, use_camera: bool, gate_chi2: float = 18.4, sigma_a: float = 1.4, point: str = "centre",
                   bearing: BearingConfig = BearingConfig(), camera_every: int = 1, burn_in: int = 10,
                   noise: MeasurementNoise = MeasurementNoise(), on_camera=None, output: OutputConfig = OutputConfig(),
-                  track: TrackConfig = TrackConfig()) -> dict:
+                  track: TrackConfig = TrackConfig(), extent: ExtentConfig = ExtentConfig(), on_scan=None) -> dict:
     folder = Path(folder)
     truth = GroundTruth.load(folder)
     camera = Calibration.from_json(folder / "calibration.json").camera
     tracker = Tracker(TrackerConfig(point=point, association=AssociationConfig(gate_chi2=gate_chi2),
-                                    filter=FilterConfig(sigma_a=sigma_a), bearing=bearing, output=output, track=track), noise)
+                                    filter=FilterConfig(sigma_a=sigma_a), bearing=bearing, output=output, track=track, extent=extent), noise)
     events = [(t, 0, i) for i, (t, _) in enumerate(scans)]
     cams = camera_timeline(folder, camera_every) if use_camera else []
     events += [(ct, 1, k) for k, (ct, _, _) in enumerate(cams)]
@@ -87,6 +88,8 @@ def replay_fusion(folder, scans: list, use_camera: bool, gate_chi2: float = 18.4
         _, items = scans[k]
         res = tracker.step([w for w, _ in items], t)
         by_id = {tr.id: tr for tr in tracker.tracks}
+        if on_scan is not None:
+            on_scan(t, tracker, res, items, truth)
         for tid, j, _ in res.matches:
             tr, (w, hid) = by_id.get(tid), items[j]
             if tr is None or hid is None or tr.state != TrackState.CONFIRMED:
