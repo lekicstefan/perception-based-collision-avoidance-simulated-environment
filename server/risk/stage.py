@@ -61,6 +61,10 @@ class StageResult:
     latency_s: float                        # smoothed latency after this cycle
     timings_ms: dict
     record: dict
+    tracks: list = field(default_factory=list)          # PredictedTrack at the time of effect (vehicle frame of the data time)
+    virtuals: list = field(default_factory=list)
+    measure: object = None                              # ViewMeasure
+    ego: object = None                                  # EgoState
 
 
 class RiskStage:
@@ -119,4 +123,5 @@ class RiskStage:
         tm["decision"] = (clk() - a) * 1e3
         tm["total"] = (clk() - t0) * 1e3
         self.delay.update(lead_s + tm["total"] * 1e-3)
-        return StageResult(cmd, d, assessment, int(raw_level), coll, len(tracks), sigma_scale, t_effect, self.delay.latency_s, tm, rec)
+        return StageResult(cmd, d, assessment, int(raw_level), coll, len(tracks), sigma_scale, t_effect, self.delay.latency_s, tm, rec,
+                           tracks, virtuals, measure, ego)

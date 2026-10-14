@@ -153,7 +153,22 @@ Python: `struct.Struct("<IdfffffffBBH")` (size 44). Unity keeps only the newest 
 
 ### 5.3 TELEMETRY (type 3)
 
-UTF-8 JSON payload for the dashboard, about 10 Hz. Never used for control. Unity ignores unknown keys.
+UTF-8 JSON payload for the dashboard, one per LiDAR scan but at most every 0.1 s of data time (10 Hz). Never used for control: a failed
+or slow telemetry send never changes a command. Unity ignores unknown keys. Schema 1; a non-finite number is `null`; the vehicle frame is
+the one of the data time (origin rear axle, x forward, y left), tracks are at the time of effect.
+
+| key | content |
+|---|---|
+| `schema` | 1 |
+| `t`, `command_id`, `speed` | data time of the scan, id of the command sent for it, ego speed (m/s) |
+| `command` | what was sent: `comfort_cap`, `safety_cap`, `comfort_decel`, `brake_request`, `emergency`, `risk_level`, `validity`, `fallback_decel` |
+| `raw` | before the smoothing: `comfort_cap`, `safety_cap`, `brake_request`, `emergency` |
+| `risk` | `level` (filtered 0..2), `raw_level`, `sight_distance_m`, `sight_limit`, `unknown_fraction`, `sight_ratio`, `cause` |
+| `decision` | `regime` 1..4, `n_hazards`, `n_virtual`, `comfort_held`, `safety_held`, `latched`, and `comfort_cause`, `safety_cause`, `brake_cause` (kind, source_id, label, state, static, d_path_m, d_eff_m, cap_mps, regime, tau_first_s, existence, margin_weight) |
+| `collision` | `{p, method, per_track}` or `null` without tracks |
+| `tracks` | per considered track: `id`, `state`, `x`, `y`, `vx`, `vy`, `speed`, `static`, `existence`, `sigma_pos`, `corners` (4 x [x, y] or `null`) |
+| `virtual` | per virtual hazard: `kind`, `cause`, `s_m`, `d_path_m`, `tau_first_s` |
+| `timing` | `stage_ms` {view, hazards, collision, decision, total}, `perception_tracking_ms`, `latency_s` (smoothed), `t_effect` |
 
 ## 6. Handshake and lifecycle
 

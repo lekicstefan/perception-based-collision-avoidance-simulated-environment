@@ -27,6 +27,10 @@ from server.risk.stopping import Regime, StoppingParams, effective_distance, lea
 @dataclass(frozen=True)
 class DecisionConfig:
     ceiling_mps: float = 40.0           # the cap when nothing limits the speed (the car's own limit)
+    emergency_min_speed_mps: float = 1.0    # below this speed "no distance left" is not an emergency: the car brakes at the maximum (regime HARD)
+                                            # but no emergency is flagged or latched (a car creeping to a stop inside its margin is not an event)
+    emergency_needs_physical: bool = True   # an emergency is flagged only when the car cannot stop before the hazard at the maximum deceleration even
+                                            # without margin and covariance; when only the margin is used up it brakes at the maximum as HARD
 
 
 @dataclass(frozen=True)
@@ -124,11 +128,32 @@ def respond_to_hazard(conflict: Conflict, speed_mps: float, params: StoppingPara
                           brake, emergency)
 
 
+def physically_unavoidable(r: HazardResponse, speed_mps: float, params: StoppingParams) -> bool:
+    """True when even the nominal distance (no margin, no covariance allowance) is too short to take the speed down to the hazard's floor speed
+    at the maximum deceleration after the delay."""
+    free = r.conflict.d_path_m - speed_mps * params.delay_s
+    if free <= 0.0:
+        return speed_mps > r.floor_mps
+    if speed_mps <= r.floor_mps:
+        return False
+    return (speed_mps ** 2 - r.floor_mps ** 2) / (2.0 * free) > params.max_decel
+
+
+def _soften(r: HazardResponse, speed_mps: float, params: StoppingParams, cfg: DecisionConfig) -> HazardResponse:
+    """An "emergency" that only uses up the margin (or happens at a creeping speed) brakes at the maximum but is the HARD regime, not an emergency."""
+    if not r.emergency:
+        return r
+    if speed_mps < cfg.emergency_min_speed_mps or (cfg.emergency_needs_physical and not physically_unavoidable(r, speed_mps, params)):
+        return replace(r, emergency=False, regime=Regime.HARD)
+    return r
+
+
 def decide(t: float, speed_mps: float, conflicts: list, virtuals: list, params: StoppingParams, risk_level: int = 1,
            cfg: DecisionConfig = DecisionConfig()) -> Decision:
     """The raw decision of a cycle from the conflicts of the tracks and the virtual hazards (nearest first or not: the order does not matter)."""
     responses = [respond_to_hazard(c, speed_mps, params) for c in conflicts]
     responses += [respond_to_hazard(v.conflict, speed_mps, params, v.floor_speed_mps, v.cause, "virtual") for v in virtuals]
+    responses = [_soften(r, speed_mps, params, cfg) for r in responses]
     if not responses:
         return Decision(t, speed_mps, cfg.ceiling_mps, cfg.ceiling_mps, NO_CAUSE, NO_CAUSE, Regime.COMFORT, 0.0, False, NO_CAUSE, int(risk_level),
                         0, 0)
