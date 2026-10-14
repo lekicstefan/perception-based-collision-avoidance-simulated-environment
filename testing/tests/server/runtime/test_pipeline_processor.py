@@ -51,3 +51,19 @@ def test_two_scans_in_a_cycle_both_run_and_the_last_command_is_returned():
     p = processor([0.5, 0.6])
     c = p.step([msg(P.MsgType.LIDAR, 0.5), msg(P.MsgType.LIDAR, 0.6, seq=1)], CAL)
     assert c.data_timestamp == 0.6 and p.stage.next_id == 3
+
+
+def test_telemetry_goes_to_the_sink_at_most_every_period_and_a_failing_sink_is_harmless():
+    p = processor([0.5, 0.52, 0.6, 0.7])
+    got = []
+    p.telemetry_sink = got.append
+    for t in (0.5, 0.52, 0.6):
+        p.step([msg(P.MsgType.LIDAR, t)], CAL)
+    assert [m["t"] for m in got] == [0.5, 0.6]                                      # 0.52 is too soon after 0.5
+    assert got[0]["schema"] == 1 and "perception_tracking_ms" in got[0]["timing"]
+
+    def broken(_):
+        raise OSError("dashboard gone")
+    p.telemetry_sink = broken
+    c = p.step([msg(P.MsgType.LIDAR, 0.7)], CAL)
+    assert c is not None and c.data_timestamp == 0.7 and p.telemetry_errors == 1     # the command is not affected

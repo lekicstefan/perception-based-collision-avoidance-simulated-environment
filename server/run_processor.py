@@ -20,7 +20,8 @@ from server.communication.transport import Link, LinkTimeout
 from server.recording.replay import ReplayLink
 from server.recording.run_log import RunLog
 from server.recording.stream_log import StreamRecorder
-from server.runtime.cycle import CycleRunner, Processor
+from server.runtime.cycle import CycleRunner
+from server.runtime.pipeline_processor import PipelineProcessor
 
 
 def main() -> None:
@@ -37,7 +38,8 @@ def main() -> None:
     logging_on = args.run_dir is not None
 
     link = ReplayLink(args.replay, speed=args.speed, period=1.0 / args.rate) if replay else Link(oracle=args.oracle)
-    processor = Processor()
+    processor = PipelineProcessor()
+    processor.telemetry_sink = getattr(link, "send_telemetry", None)          # the replay link has none: no telemetry then
     run_log = recorder = runner = boundary = None
     try:
         run_dir = None
