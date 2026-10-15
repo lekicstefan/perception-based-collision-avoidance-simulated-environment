@@ -1,11 +1,16 @@
 """End to end without Unity (step 7.15): the real perception, tracker and risk stage drive a simple car in ray-cast scenes."""
-import pytest
+import pytest  # noqa: F401
 
 from testing.support.closed_loop import Box, LoopConfig, run_loop
 
 
 def first_emergency(r):
-    return next((q for q in r.rows if q["emergency"]), None)
+    """The rows around the first emergency in words (None without one), for the failure message."""
+    i = next((k for k, q in enumerate(r.rows) if q["emergency"]), None)
+    if i is None:
+        return None
+    return "\n" + "\n".join(f"t={q['t']:.1f} x={q['x']:.1f} v={q['v']:.2f} brake={q['brake_request']:.1f} emergency={q['emergency']} {q['detail']}"
+                            for q in r.rows[max(0, i - 4):i + 2])
 
 
 def test_an_empty_road_is_driven_without_braking():
@@ -29,22 +34,14 @@ def test_a_narrow_pedestrian_sized_object_in_the_lane_is_stopped_for():
     assert not r.any_emergency, first_emergency(r)                                      # the end of the stop uses the margin only
 
 
-PARKED = ([Box(50.0, 3.5)], LoopConfig(start_speed_mps=10.0, desired_mps=10.0, duration_s=12.0))
+PARKED = ([Box(50.0, 3.5)], LoopConfig(start_speed_mps=10.0, desired_mps=10.0, duration_s=40.0))
 
 
-def test_a_parked_car_beside_the_road_is_never_hit():
+def test_a_parked_car_beside_the_road_is_passed_without_a_collision_or_an_emergency():
     r = run_loop(*PARKED)
     assert not r.collided
-
-
-@pytest.mark.xfail(reason="KNOWN DESIGN ISSUE (7.3 time-of-arrival test): a car 1.4 m outside the corridor can reach it within 0.3 s by the reachable-set bound, "
-                          "and the clearing time is computed at the CURRENT speed, so the slower the car gets the longer the conflict lasts: the car "
-                          "stops beside the parked car and never passes (dry_run --trace parked). To be decided by the author; see notes_phase7.md.",
-                   strict=False)
-def test_a_parked_car_beside_the_road_is_passed_without_an_emergency():
-    r = run_loop(*PARKED)
     assert not r.any_emergency, first_emergency(r)
-    assert r.final["x"] > 60.0 and not r.stopped
+    assert r.final["x"] > 60.0 and not r.stopped                                      # it slowed to the floor speed, passed, and drove on
 
 
 def test_the_time_per_scan_fits_the_budget_on_average():

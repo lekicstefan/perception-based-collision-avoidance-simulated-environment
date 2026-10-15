@@ -29,6 +29,9 @@ class DecisionConfig:
     ceiling_mps: float = 40.0           # the cap when nothing limits the speed (the car's own limit)
     emergency_min_speed_mps: float = 1.0    # below this speed "no distance left" is not an emergency: the car brakes at the maximum (regime HARD)
                                             # but no emergency is flagged or latched (a car creeping to a stop inside its margin is not an event)
+    side_floor_enabled: bool = True         # a conflict that exists only because the object COULD reach the corridor (its nominal motion stays out of it:
+                                            # a parked car, a person on the pavement) gets the occluded approach speed as a floor, like a hidden side strip,
+                                            # so the car passes at that speed instead of stopping beside it
     emergency_needs_physical: bool = True   # an emergency is flagged only when the car cannot stop before the hazard at the maximum deceleration even
                                             # without margin and covariance; when only the margin is used up it brakes at the maximum as HARD
 
@@ -149,9 +152,9 @@ def _soften(r: HazardResponse, speed_mps: float, params: StoppingParams, cfg: De
 
 
 def decide(t: float, speed_mps: float, conflicts: list, virtuals: list, params: StoppingParams, risk_level: int = 1,
-           cfg: DecisionConfig = DecisionConfig()) -> Decision:
+           cfg: DecisionConfig = DecisionConfig(), side_floor_mps: float = 0.0) -> Decision:
     """The raw decision of a cycle from the conflicts of the tracks and the virtual hazards (nearest first or not: the order does not matter)."""
-    responses = [respond_to_hazard(c, speed_mps, params) for c in conflicts]
+    responses = [respond_to_hazard(c, speed_mps, params, side_floor_mps if (cfg.side_floor_enabled and not c.in_corridor) else 0.0) for c in conflicts]
     responses += [respond_to_hazard(v.conflict, speed_mps, params, v.floor_speed_mps, v.cause, "virtual") for v in virtuals]
     responses = [_soften(r, speed_mps, params, cfg) for r in responses]
     if not responses:
