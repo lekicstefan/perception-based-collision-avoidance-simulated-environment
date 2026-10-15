@@ -9,6 +9,7 @@ and the command it returns takes effect after `delay_s`. The car model is a stan
 """
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from types import SimpleNamespace
@@ -77,6 +78,24 @@ class LoopResult:
         return float(np.percentile([r[key] for r in self.rows], q)) if self.rows else 0.0
 
 
+def detail(tele) -> str:
+    """The strongest response of a scan in words, with the track behind it (for the failure messages of the tests and for dry_run --trace)."""
+    rs = tele.decision.responses
+    if not rs:
+        return "no hazard"
+    r = max(rs, key=lambda q: (int(q.regime), q.a_req if math.isfinite(q.a_req) else 1e18))
+    c = r.conflict
+    out = (f"{r.label} regime={int(r.regime)} in_corridor={getattr(c, 'in_corridor', None)} floor={r.floor_mps} d_path={c.d_path_m:.2f} "
+           f"d_eff={r.d_eff_m:.2f} tau={c.tau_first_s:.1f} v_along={c.v_along_mps:.2f}")
+    tr = next((p for p in tele.tracks if p.id == c.track_id), None)
+    if tr is not None:
+        corners = "" if tr.surface is None else " corners=" + str([(round(float(tr.position[0] + q[0]), 1), round(float(tr.position[1] + q[1]), 1))
+                                                                   for q in tr.surface[:4]])
+        out += (f" | {tr.state} static={tr.static} pos=({tr.position[0]:.1f},{tr.position[1]:.1f}) vel=({tr.velocity[0]:.2f},{tr.velocity[1]:.2f}) "
+                f"exist={tr.existence:.2f}{corners}")
+    return out
+
+
 def gap_to(boxes: list, x: float) -> float:
     """Distance from the front bumper to the nearest box rear face ahead that overlaps the car's width (inf if none)."""
     best = float("inf")
@@ -113,7 +132,7 @@ def run_loop(boxes: list, cfg: LoopConfig = LoopConfig(), processor_cfg: Process
                          "regime": int(tele.decision.regime), "raw_safety_cap": tele.decision.safety_cap,
                          "brake_cause": tele.record["brake_cause"]["label"], "brake_d_path_m": tele.record["brake_cause"]["d_path_m"],
                          "brake_d_eff_m": tele.record["brake_cause"]["d_eff_m"], "brake_tau_s": tele.record["brake_cause"]["tau_first_s"],
-                         "comfort_cause": tele.record["comfort_cause"]["label"]})
+                         "comfort_cause": tele.record["comfort_cause"]["label"], "detail": detail(tele)})
         for _ in range(round(cfg.scan_dt_s / cfg.sub_dt_s)):
             while pending and pending[0][0] <= t + 1e-9:
                 active = pending.pop(0)[1]

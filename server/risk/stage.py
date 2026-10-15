@@ -111,7 +111,7 @@ class RiskStage:
         tm["collision"] = (clk() - a) * 1e3
 
         a = clk()
-        d = decide(t, speed, conflicts, virtuals, params, int(assessment.level), cfg.decision)
+        d = decide(t, speed, conflicts, virtuals, params, int(assessment.level), cfg.decision, side_floor_mps=assessment.bundle.occluded_speed_mps)
         comfort, safety = self.comfort.update(t, d.comfort_cap), self.safety.update(t, d.safety_cap)
         brake, latched = self.brake.update(t, d.brake_request, d.emergency)
         emergency = bool(d.emergency or latched)

@@ -54,6 +54,8 @@ class HazardConfig:
     include_tentative: bool = True
     tentative_margin_weight: float = 0.5
     min_clear_speed_mps: float = 0.1    # a slower car does not clear a segment
+    nominal_velocity_sigma_k: float = 2.0   # the NOMINAL motion (in_corridor) uses the estimated speed reduced by this many standard deviations of the velocity:
+                                            # a standing object whose velocity estimate is noise (0.4 m/s +- 0.2) is not "walking into the lane"
 
 
 @dataclass(frozen=True)
@@ -71,6 +73,8 @@ class Conflict:
     sigma_d_m: float
     margin_weight: float
     existence: float
+    in_corridor: bool = True        # the NOMINAL motion (no reachable-set growth, no covariance) of the object enters the corridor; False: the conflict
+                                    # exists only because the object could (worst case) get there: a precaution, answered with a floor speed (decision.py)
 
 
 def is_hazard(track: PredictedTrack, cfg: HazardConfig = HazardConfig()) -> bool:
@@ -123,6 +127,26 @@ def corridor_interval(centres: np.ndarray, radius: float, corridor: Corridor):
     return float(np.min(s[hit] - half)), float(np.max(s[hit] + half))
 
 
+def nominal_velocity(track: PredictedTrack, vel: np.ndarray, k: float) -> np.ndarray:
+    """The estimated velocity with its speed reduced by k standard deviations (not below zero): the part of the motion that is significant."""
+    speed = float(np.hypot(*vel))
+    if speed < 1e-9 or k <= 0.0:
+        return vel
+    sigma = math.sqrt(max(float(np.linalg.eigvalsh(0.5 * (track.vel_cov + track.vel_cov.T))[-1]), 0.0))
+    return vel * (max(speed - k * sigma, 0.0) / speed)
+
+
+def nominal_in_corridor(centres: np.ndarray, vel: np.ndarray, taus: np.ndarray, corridor: Corridor, tail0: float,
+                        cfg: HazardConfig = HazardConfig()) -> bool:
+    """Does the object, moving at its estimated velocity (zero for a static one) and with only the base radius around its surface points, enter the
+    corridor ahead of the rear of the car within the horizon?"""
+    for tau in taus:
+        iv = corridor_interval(centres + vel * tau, cfg.base_radius_m, corridor)
+        if iv is not None and iv[1] >= tail0 and iv[0] <= corridor.length_m:
+            return True
+    return False
+
+
 def find_conflicts(tracks: list, corridor: Corridor, ego_speed_mps: float, ego_travel_m: float = 0.0,
                    geometry: EgoGeometry = EgoGeometry(), cfg: HazardConfig = HazardConfig(), sigma_scale: float = 1.0,
                    ego_sigma_m: float = 0.0) -> list:
@@ -156,5 +180,5 @@ def find_conflicts(tracks: list, corridor: Corridor, ego_speed_mps: float, ego_t
             track_id=tr.id, state=tr.state, static=tr.static, tau_first_s=tau_first, s_conflict_m=a,
             d_path_m=max(a - corridor.front_offset_m - ego_travel_m, 0.0), segment_m=(a, b), t_clear_s=t_clear, v_along_mps=v_h,
             v_sigma_mps=v_sig, sigma_d_m=distance_sigma(tr.pos_cov, tangent, ego_sigma_m), margin_weight=margin_weight(tr, cfg),
-            existence=tr.existence))
+            existence=tr.existence, in_corridor=nominal_in_corridor(tr.position + offs, nominal_velocity(tr, vel, cfg.nominal_velocity_sigma_k), taus, corridor, tail0, cfg)))
     return sorted(out, key=lambda c: c.d_path_m)
