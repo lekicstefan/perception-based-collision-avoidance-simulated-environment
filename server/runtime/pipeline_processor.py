@@ -35,6 +35,8 @@ from server.tracking.tracker import Tracker, TrackerConfig
 class ProcessorConfig:
     gate_chi2: float = 18.4                 # tuned in 6.9
     sigma_extent_m: float = 0.4
+    sigma_extent_across_m: float = 0.3      # noise of the middle of the visible extent across the line of sight (MeasurementNoise); 0.3 and 0.5 give the same
+                                            # result on the parked car (one track id for the box instead of five), 0 is the old behaviour
     pose_position_sigma_m: float = 0.0      # what the tracker is told; the same value goes to the stage as ego_sigma_m
     pose_yaw_sigma_rad: float = 0.0
     stage: StageConfig = field(default_factory=StageConfig)
@@ -61,8 +63,8 @@ class PipelineProcessor(Processor):
         cfg = self.config
         self.calibration = cal
         self.pipeline = PerceptionPipeline(cal)
-        noise = MeasurementNoise(sigma_extent_m=cfg.sigma_extent_m, pose_position_sigma_m=cfg.pose_position_sigma_m,
-                                 pose_yaw_sigma_rad=cfg.pose_yaw_sigma_rad)
+        noise = MeasurementNoise(sigma_extent_m=cfg.sigma_extent_m, sigma_extent_across_m=cfg.sigma_extent_across_m,
+                                 pose_position_sigma_m=cfg.pose_position_sigma_m, pose_yaw_sigma_rad=cfg.pose_yaw_sigma_rad)
         stage_cfg = replace(cfg.stage, ego_sigma_m=cfg.pose_position_sigma_m)        # one noise for the tracker and for the distance sigma
         self.tracker = Tracker(TrackerConfig(association=AssociationConfig(gate_chi2=cfg.gate_chi2),
                                              filter=FilterConfig(sigma_a=stage_cfg.sigma_a)), noise)

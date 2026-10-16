@@ -38,6 +38,8 @@ class MeasurementNoise:
     range_relative_sigma: float = 0.0       # extra range error as a fraction of the range
     azimuth_step_rad: float = math.radians(0.2)
     sigma_extent_m: float = 0.4             # (tuned in 6.9, was 0.7) uncertainty of the unseen depth, added along the line of sight for the centre
+    sigma_extent_across_m: float = 0.0      # uncertainty of the MIDDLE of the visible extent across the line of sight, for the centre (the visible part of a
+                                            # big object changes from scan to scan, the middle moves): 0 = off (the 6.x behaviour); the processor sets 0.3
     pose_position_sigma_m: float = 0.0      # pose noise of the car (position)
     pose_yaw_sigma_rad: float = 0.0         # pose noise of the car (yaw): moves a point at range r sideways by r sigma
     floor_m: float = 0.01                   # no standard deviation is smaller than this
@@ -52,6 +54,8 @@ class MeasurementNoise:
             along2 += self.sigma_extent_m ** 2
         cell = range_m * self.azimuth_step_rad
         across2 = cell ** 2 / 12.0 + (range_m * self.pose_yaw_sigma_rad) ** 2 + self.pose_position_sigma_m ** 2
+        if point != "nearest":
+            across2 += self.sigma_extent_across_m ** 2
         return max(math.sqrt(along2), self.floor_m), max(math.sqrt(across2), self.floor_m)
 
     def covariance(self, range_m: float, world_bearing: float, point: str = "nearest") -> np.ndarray:

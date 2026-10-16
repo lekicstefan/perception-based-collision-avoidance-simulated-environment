@@ -7,6 +7,8 @@
   python -m server.run_processor --replay runs/<id> --speed 0                 # replay, no run folder
   python -m server.run_processor --replay runs/<id> --speed 0 --run-dir       # replay, runs/<date_time>_replay
   python -m server.run_processor --replay runs/<id> --run-dir mytest          # replay, runs/mytest
+  python -m server.run_processor --pose-sigma-m 0.05 --pose-sigma-yaw-deg 0.5  # tell the tracker and the risk stage the pose noise of the simulation
+  python -m server.run_processor --no-double-count                             # reachable radius without the present position sigma (7.9, off by default)
 
 Live: start this first, then press Play in Unity. With --run-dir the processor chooses the folder and tells Unity in
 the READY message, so Unity writes its logs into the same folder. Without --run-dir neither side writes a run folder
@@ -14,6 +16,7 @@ the READY message, so Unity writes its logs into the same folder. Without --run-
 """
 import argparse
 import dataclasses
+import math
 
 from server.communication.boundary import check_stream
 from server.communication.transport import Link, LinkTimeout
@@ -21,7 +24,9 @@ from server.recording.replay import ReplayLink
 from server.recording.run_log import RunLog
 from server.recording.stream_log import StreamRecorder
 from server.runtime.cycle import CycleRunner
-from server.runtime.pipeline_processor import PipelineProcessor
+from server.risk.hazards import HazardConfig
+from server.risk.stage import StageConfig
+from server.runtime.pipeline_processor import PipelineProcessor, ProcessorConfig
 
 
 def main() -> None:
@@ -33,12 +38,24 @@ def main() -> None:
     ap.add_argument("--no-record", action="store_true", help="with --run-dir: do not write stream.bin")
     ap.add_argument("--replay", default=None, help="a stream.bin, a run folder or its python folder")
     ap.add_argument("--speed", type=float, default=1.0, help="replay speed, 1 = original timing, 0 = as fast as possible")
+    ap.add_argument("--pose-sigma-m", type=float, default=0.0, help="pose noise of the car's position (m): goes to the tracker and to the distance sigma of the risk stage")
+    ap.add_argument("--pose-sigma-yaw-deg", type=float, default=0.0, help="pose noise of the car's heading (degrees): goes to the tracker")
+    ap.add_argument("--extent-across-m", type=float, default=ProcessorConfig().sigma_extent_across_m,
+                    help="noise of the middle of the visible extent across the line of sight (m) for the tracker, 0 = off")
+    ap.add_argument("--no-double-count", action="store_true", help="the reachable radius gets only the growth of the position sigma, not its present value (HazardConfig.subtract_current_sigma)")
     args = ap.parse_args()
+    if args.pose_sigma_m < 0.0 or args.pose_sigma_yaw_deg < 0.0:
+        ap.error("the pose noise cannot be negative")
     replay = args.replay is not None
     logging_on = args.run_dir is not None
 
     link = ReplayLink(args.replay, speed=args.speed, period=1.0 / args.rate) if replay else Link(oracle=args.oracle)
-    processor = PipelineProcessor()
+    config = ProcessorConfig(sigma_extent_across_m=args.extent_across_m, pose_position_sigma_m=args.pose_sigma_m, pose_yaw_sigma_rad=math.radians(args.pose_sigma_yaw_deg),
+                             stage=StageConfig(hazard=HazardConfig(subtract_current_sigma=args.no_double_count)))
+    processor = PipelineProcessor(config)
+    print(f"pose noise: position {args.pose_sigma_m:g} m, heading {args.pose_sigma_yaw_deg:g} deg"
+          f"{' (no pose noise told to the tracker)' if args.pose_sigma_m == 0.0 and args.pose_sigma_yaw_deg == 0.0 else ''}; "
+          f"covariance in the reachable radius: {'growth only' if args.no_double_count else 'full (default)'}")
     processor.telemetry_sink = getattr(link, "send_telemetry", None)          # the replay link has none: no telemetry then
     run_log = recorder = runner = boundary = None
     try:
