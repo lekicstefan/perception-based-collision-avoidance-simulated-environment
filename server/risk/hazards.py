@@ -29,7 +29,8 @@ false alarm) counts with `tentative_margin_weight`, so that it is a hazard from 
 it is confirmed (the caps use the surface distance and the stopping model either way).
 Known simplifications: the region of a track is a union of discs on its visible surface (the unseen back of an object is not part of
 it); the covariance term is in the region and also in d_eff (the distance uncertainty), a small double count that the sensitivity
-analysis (7.9) shows; the speed of the car is held constant over the horizon.
+analysis (7.9) shows and that `HazardConfig.subtract_current_sigma` removes (off by default: the conservative choice stays until the pilot sweep);
+the speed of the car is held constant over the horizon.
 """
 from __future__ import annotations
 
@@ -54,6 +55,8 @@ class HazardConfig:
     include_tentative: bool = True
     tentative_margin_weight: float = 0.5
     min_clear_speed_mps: float = 0.1    # a slower car does not clear a segment
+    subtract_current_sigma: bool = False    # False (default, conservative): the position covariance is in the reachable radius AND in d_eff (a double count).
+                                            # True: the radius only gets the GROWTH of the position sigma since tau = 0; the present uncertainty is left to d_eff
     nominal_velocity_sigma_k: float = 2.0   # the NOMINAL motion (in_corridor) uses the estimated speed reduced by this many standard deviations of the velocity:
                                             # a standing object whose velocity estimate is noise (0.4 m/s +- 0.2) is not "walking into the lane"
 
@@ -113,7 +116,10 @@ def _sigma_pos(track: PredictedTrack, tau: float) -> float:
 
 
 def reachable_radius(track: PredictedTrack, tau: float, sigma_scale: float, cfg: HazardConfig = HazardConfig()) -> float:
-    return cfg.base_radius_m + 0.5 * cfg.max_object_accel * tau * tau + sigma_scale * _sigma_pos(track, tau)
+    sigma = _sigma_pos(track, tau)
+    if cfg.subtract_current_sigma:
+        sigma = max(sigma - _sigma_pos(track, 0.0), 0.0)         # d_eff (sigma_d) already holds the present position uncertainty
+    return cfg.base_radius_m + 0.5 * cfg.max_object_accel * tau * tau + sigma_scale * sigma
 
 
 def corridor_interval(centres: np.ndarray, radius: float, corridor: Corridor):
