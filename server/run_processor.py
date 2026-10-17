@@ -10,6 +10,7 @@
   python -m server.run_processor --pose-sigma-m 0.05 --pose-sigma-yaw-deg 0.5  # tell the tracker and the risk stage the pose noise of the simulation
   python -m server.run_processor --no-double-count                             # reachable radius without the present position sigma (7.9, off by default)
   python -m server.run_processor --pin 2,4                                     # pin this process to logical CPUs 2 and 4 and give it high priority (section 4.2)
+  python -m server.run_processor --max-scans-per-cycle 0                       # no load shedding (default 2: at most the two newest scans per cycle, see shedding.py)
 
 Live: start this first, then press Play in Unity. With --run-dir the processor chooses the folder and tells Unity in
 the READY message, so Unity writes its logs into the same folder. Without --run-dir neither side writes a run folder
@@ -30,6 +31,7 @@ from server.risk.hazards import HazardConfig
 from server.risk.stage import StageConfig
 from server.runtime.pinning import parse_cpu_list, pin_process
 from server.runtime.pipeline_processor import PipelineProcessor, ProcessorConfig
+from server.runtime.shedding import SheddingConfig
 
 
 def main() -> None:
@@ -47,9 +49,13 @@ def main() -> None:
                     help="noise of the middle of the visible extent across the line of sight (m) for the tracker, 0 = off")
     ap.add_argument("--no-double-count", action="store_true", help="the reachable radius gets only the growth of the position sigma, not its present value (HazardConfig.subtract_current_sigma)")
     ap.add_argument("--pin", default=None, metavar="CPUS", help="pin this process to these logical CPUs and give it high priority, for example 2,4 or 2-5 (section 4.2: the processor and Unity run on separate cores in every timing experiment)")
+    ap.add_argument("--max-scans-per-cycle", type=int, default=SheddingConfig().max_scans_per_cycle, metavar="N",
+                    help="load shedding: when more scans are waiting, only the N newest are processed and the older ones are skipped and counted; 0 = never skip")
     args = ap.parse_args()
     if args.pose_sigma_m < 0.0 or args.pose_sigma_yaw_deg < 0.0:
         ap.error("the pose noise cannot be negative")
+    if args.max_scans_per_cycle < 0:
+        ap.error("--max-scans-per-cycle cannot be negative")
     pin_info = None
     if args.pin is not None:
         try:
@@ -98,7 +104,7 @@ def main() -> None:
             link.stop_buffering()                            # nothing is recorded, drop what was buffered
         print(f"handshake done, calibration id {link.calibration_id}" if not replay else "replay started")
         runner = CycleRunner(link, processor, rate_hz=args.rate, run_log=run_log,
-                             realtime=not (replay and args.speed <= 0))
+                             realtime=not (replay and args.speed <= 0), shedding=SheddingConfig(max_scans_per_cycle=args.max_scans_per_cycle))
         runner.run(args.seconds)
     except KeyboardInterrupt:
         print("interrupted")
