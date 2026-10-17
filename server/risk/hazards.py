@@ -78,6 +78,7 @@ class Conflict:
     existence: float
     in_corridor: bool = True        # the NOMINAL motion (no reachable-set growth, no covariance) of the object enters the corridor; False: the conflict
                                     # exists only because the object could (worst case) get there: a precaution, answered with a floor speed (decision.py)
+    age_s: float = math.inf         # age of the track (inf: unknown, treated as established); a young track's velocity is not trusted for the relative floor
 
 
 def is_hazard(track: PredictedTrack, cfg: HazardConfig = HazardConfig()) -> bool:
@@ -186,5 +187,6 @@ def find_conflicts(tracks: list, corridor: Corridor, ego_speed_mps: float, ego_t
             track_id=tr.id, state=tr.state, static=tr.static, tau_first_s=tau_first, s_conflict_m=a,
             d_path_m=max(a - corridor.front_offset_m - ego_travel_m, 0.0), segment_m=(a, b), t_clear_s=t_clear, v_along_mps=v_h,
             v_sigma_mps=v_sig, sigma_d_m=distance_sigma(tr.pos_cov, tangent, ego_sigma_m), margin_weight=margin_weight(tr, cfg),
-            existence=tr.existence, in_corridor=nominal_in_corridor(tr.position + offs, nominal_velocity(tr, vel, cfg.nominal_velocity_sigma_k), taus, corridor, tail0, cfg)))
+            existence=tr.existence, in_corridor=nominal_in_corridor(tr.position + offs, nominal_velocity(tr, vel, cfg.nominal_velocity_sigma_k), taus, corridor, tail0, cfg),
+            age_s=tr.age_s))
     return sorted(out, key=lambda c: c.d_path_m)

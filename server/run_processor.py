@@ -9,6 +9,7 @@
   python -m server.run_processor --replay runs/<id> --run-dir mytest          # replay, runs/mytest
   python -m server.run_processor --pose-sigma-m 0.05 --pose-sigma-yaw-deg 0.5  # tell the tracker and the risk stage the pose noise of the simulation
   python -m server.run_processor --no-double-count                             # reachable radius without the present position sigma (7.9, off by default)
+  python -m server.run_processor --pin 2,4                                     # pin this process to logical CPUs 2 and 4 and give it high priority (section 4.2)
 
 Live: start this first, then press Play in Unity. With --run-dir the processor chooses the folder and tells Unity in
 the READY message, so Unity writes its logs into the same folder. Without --run-dir neither side writes a run folder
@@ -24,8 +25,10 @@ from server.recording.replay import ReplayLink
 from server.recording.run_log import RunLog
 from server.recording.stream_log import StreamRecorder
 from server.runtime.cycle import CycleRunner
+from server.risk.cause_log import CauseLog
 from server.risk.hazards import HazardConfig
 from server.risk.stage import StageConfig
+from server.runtime.pinning import parse_cpu_list, pin_process
 from server.runtime.pipeline_processor import PipelineProcessor, ProcessorConfig
 
 
@@ -43,9 +46,17 @@ def main() -> None:
     ap.add_argument("--extent-across-m", type=float, default=ProcessorConfig().sigma_extent_across_m,
                     help="noise of the middle of the visible extent across the line of sight (m) for the tracker, 0 = off")
     ap.add_argument("--no-double-count", action="store_true", help="the reachable radius gets only the growth of the position sigma, not its present value (HazardConfig.subtract_current_sigma)")
+    ap.add_argument("--pin", default=None, metavar="CPUS", help="pin this process to these logical CPUs and give it high priority, for example 2,4 or 2-5 (section 4.2: the processor and Unity run on separate cores in every timing experiment)")
     args = ap.parse_args()
     if args.pose_sigma_m < 0.0 or args.pose_sigma_yaw_deg < 0.0:
         ap.error("the pose noise cannot be negative")
+    pin_info = None
+    if args.pin is not None:
+        try:
+            pin_info = pin_process(parse_cpu_list(args.pin))
+        except (ValueError, OSError, NotImplementedError) as e:
+            ap.error(f"--pin: {e}")
+        print(f"pinned to logical CPUs {pin_info['cpus']} (mask 0x{pin_info['mask']:X}), priority {pin_info['priority']}")
     replay = args.replay is not None
     logging_on = args.run_dir is not None
 
@@ -79,6 +90,7 @@ def main() -> None:
             if not replay and not args.no_record:
                 recorder = StreamRecorder(run_log.dir / "stream.bin")
                 link.attach_recorder(recorder)
+            processor.log = CauseLog(run_log.dir / "cause.jsonl", keep=False)          # the cause of every cap and braking decision, for the evaluation
             print(f"logging to {run_log.dir}")
         else:
             print("no run folder (add --run-dir to log this run)")
@@ -107,7 +119,9 @@ def main() -> None:
             boundary = {"ok": rep.ok, "messages": rep.messages, "counts": rep.counts, "problems": rep.problems[:10]}
             print("information boundary: " + ("OK" if rep.ok else f"{len(rep.problems)} PROBLEMS, first: {rep.problems[0]}"))
         if run_log is not None:
-            run_log.write_summary(cycle=runner.stats() if runner else None,
+            if processor.log is not None:
+                processor.log.close()
+            run_log.write_summary(pin=pin_info, cycle=runner.stats() if runner else None,
                                   streams={n: dataclasses.asdict(s) for n, s in link.stats.items()},
                                   calibration_id=link.calibration_id, ended=link.ended, end_sim_time=link.end_sim_time,
                                   malformed_messages=link.error_count, first_errors=link.errors[:5],

@@ -1,5 +1,7 @@
 """A conflict that exists only because an object could reach the corridor is answered with a floor speed (step 7.15 follow-up):
 a car parked beside the road is passed, not stopped for. An object whose nominal motion enters the corridor is not affected."""
+import math
+
 import numpy as np
 import pytest
 
@@ -8,7 +10,7 @@ from server.risk.ego_path import EgoGeometry, EgoState, make_corridor
 from server.risk.hazards import Conflict, find_conflicts
 from server.risk.risk_level import BUNDLES, RiskLevel
 from server.risk.timing import PredictedTrack
-from server.risk.stopping import Regime
+from server.risk.stopping import Regime, lead_speed_low
 
 P = BUNDLES[RiskLevel.MEDIUM].apply()
 FLOOR = BUNDLES[RiskLevel.MEDIUM].occluded_speed_mps                   # 2.0
@@ -73,3 +75,69 @@ def test_an_object_in_the_corridor_gets_no_floor():
 def test_the_floor_can_be_switched_off():
     d = decide(0.0, 1.5, [conflict(3.3, False)], [], P, cfg=DecisionConfig(side_floor_enabled=False), side_floor_mps=FLOOR)
     assert d.safety_cap < FLOOR
+
+def walking(d, v, sigma=0.0, age=math.inf):
+    """A precaution-only conflict whose hazard moves ahead along the path at v m/s (standard deviation sigma) and whose track is `age` seconds old."""
+    return Conflict(track_id=1, state="confirmed", static=False, tau_first_s=0.5, s_conflict_m=d + 3.5, d_path_m=d, segment_m=(d + 3.5, d + 4.0),
+                    t_clear_s=10.0, v_along_mps=v, v_sigma_mps=sigma, sigma_d_m=0.5, margin_weight=1.0, existence=1.0, in_corridor=False, age_s=age)
+
+
+def test_the_floor_is_relative_to_a_hazard_that_moves_ahead_along_the_path():
+    d = decide(0.0, 1.5, [walking(3.3, 1.4)], [], P, side_floor_mps=FLOOR)
+    assert d.comfort_cap == pytest.approx(FLOOR + lead_speed_low(1.4, 0.0, P))
+
+
+def test_a_car_passing_at_the_pace_of_a_walker_is_not_braked_for():
+    d = decide(0.0, 3.0, [walking(3.3, 1.4)], [], P, side_floor_mps=FLOOR)       # faster than the old absolute floor (2.0), slower than the new one (3.4)
+    assert d.brake_request == 0.0 and d.comfort_cap >= 3.0
+
+
+def test_the_lower_quantile_of_the_speed_is_used_so_that_a_noisy_velocity_gives_less():
+    d = decide(0.0, 1.5, [walking(3.3, 1.4, sigma=0.35, age=20.0)], [], P, side_floor_mps=FLOOR)       # about what the walking pedestrian of the dev scene shows
+    assert d.comfort_cap == pytest.approx(FLOOR + lead_speed_low(1.4, 0.35, P)) and FLOOR < d.comfort_cap < FLOOR + 1.4
+
+
+def test_the_relative_floor_needs_an_established_track():
+    old = decide(0.0, 1.5, [walking(3.3, 1.4, sigma=0.1, age=3.0)], [], P, side_floor_mps=FLOOR)
+    assert old.comfort_cap == pytest.approx(FLOOR + lead_speed_low(1.4, 0.1, P))
+    young = decide(0.0, 1.5, [walking(3.3, 1.4, sigma=0.1, age=2.9)], [], P, side_floor_mps=FLOOR)
+    assert young.comfort_cap == pytest.approx(FLOOR)                              # just below the limit: the plain floor
+
+
+def test_a_phantom_velocity_of_a_young_track_does_not_lift_the_floor():
+    d = decide(0.0, 1.5, [walking(3.3, 1.2, sigma=0.36, age=0.5)], [], P, side_floor_mps=FLOOR)       # the sliver of a standing box in the closed-loop scene
+    assert d.comfort_cap == pytest.approx(FLOOR)
+
+
+def test_the_relative_floor_can_be_switched_off():
+    d = decide(0.0, 1.5, [walking(3.3, 1.4)], [], P, cfg=DecisionConfig(side_floor_relative=False), side_floor_mps=FLOOR)
+    assert d.comfort_cap == pytest.approx(FLOOR)
+
+
+def test_a_precaution_asks_for_no_braking_once_the_car_is_at_its_conflict_point():
+    d = decide(0.0, 5.0, [conflict(0.0, False)], [], P, side_floor_mps=FLOOR)
+    assert d.brake_request == 0.0 and not d.emergency and d.regime == Regime.COMFORT and d.comfort_cap == pytest.approx(FLOOR)
+    assert decide(0.0, 5.0, [conflict(0.0, True)], [], P, side_floor_mps=FLOOR).emergency       # a real obstacle at the bumper is still an emergency
+
+
+def test_the_cause_carries_the_floor_the_velocity_and_the_age_it_was_based_on():
+    d = decide(0.0, 1.5, [walking(3.3, 1.4, sigma=0.1, age=12.0)], [], P, side_floor_mps=FLOOR)
+    c = d.comfort_cause.to_dict()
+    assert c["floor_mps"] == pytest.approx(FLOOR + lead_speed_low(1.4, 0.1, P)) and c["v_along_mps"] == 1.4 and c["v_sigma_mps"] == 0.1 and c["age_s"] == 12.0
+
+
+def test_find_conflicts_passes_the_age_of_the_track_on():
+    (c,) = conflicts(track(30.0, 3.5))
+    assert c.age_s == 5.0
+
+
+def test_the_slow_down_to_the_floor_is_judged_on_the_nominal_distance():
+    d = decide(0.0, 2.6, [conflict(1.6, False)], [], P, side_floor_mps=FLOOR)               # a little above the floor, inside margin plus covariance
+    assert d.brake_request == 0.0 and d.regime == Regime.COMFORT and not d.emergency        # (d_eff is negative here: the old rule braked at the maximum)
+    assert d.comfort_cap == pytest.approx(FLOOR)                                            # the caps still carry the margin
+
+
+def test_a_fast_approach_to_a_precaution_still_brakes_in_time():
+    d = decide(0.0, 10.0, [conflict(12.0, False)], [], P, side_floor_mps=FLOOR)
+    expected = (10.0 ** 2 - FLOOR ** 2) / (2.0 * (12.0 - 10.0 * P.delay_s))
+    assert d.regime == Regime.PROGRESSIVE and d.brake_request == pytest.approx(expected)

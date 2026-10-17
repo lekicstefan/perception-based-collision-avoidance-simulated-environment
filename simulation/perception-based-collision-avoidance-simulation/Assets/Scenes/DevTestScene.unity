@@ -1799,7 +1799,7 @@ MonoBehaviour:
   lookaheadPerSpeed: 0.4
   lookaheadMax: 15
   endMargin: 0.5
-  logInterval: 5
+  logInterval: 10000
   writeAccelToVehicle: 1
 --- !u!1 &1172408298
 GameObject:
@@ -2844,7 +2844,7 @@ MonoBehaviour:
   drawPointCloud: 1
   gizmoStride: 1
   showStats: 1
-  logEveryScans: 50
+  logEveryScans: 250
   poseEstimator: {fileID: 1541853452}
 --- !u!114 &1541853451
 MonoBehaviour:
@@ -2866,7 +2866,7 @@ MonoBehaviour:
   readbackOrder: 0
   showPreview: 1
   previewEveryN: 3
-  logEveryFrames: 60
+  logEveryFrames: 300
   poseEstimator: {fileID: 1541853452}
 --- !u!114 &1541853452
 MonoBehaviour:
@@ -2884,7 +2884,7 @@ MonoBehaviour:
   vehicle: {fileID: 1128943756}
   drawGizmo: 1
   showStats: 1
-  logInterval: 5
+  logInterval: 0
 --- !u!114 &1541853453
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2915,7 +2915,7 @@ MonoBehaviour:
   lidar: {fileID: 1541853450}
   cameraSensor: {fileID: 1541853451}
   pose: {fileID: 1541853452}
-  reportEvery: 10
+  reportEvery: 0
 --- !u!114 &1541853455
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2923,7 +2923,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1541853446}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: aecb7c9e9a5b76e478d9f48da014ccda, type: 3}
   m_Name: 
@@ -2941,7 +2941,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1541853446}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1953c524e2f1bac43a7080d858c16382, type: 3}
   m_Name: 
@@ -2969,7 +2969,7 @@ MonoBehaviour:
   groundTruth: {fileID: 1541853458}
   outputFolder: testing/data/recordings
   sceneName: dev
-  stopAfterSeconds: 21
+  stopAfterSeconds: 0
   persistData: 0
 --- !u!114 &1541853458
 MonoBehaviour:
@@ -2990,7 +2990,7 @@ MonoBehaviour:
   runName: 
   logEveryNSteps: 1
   useRunFolder: 1
-  persistData: 0
+  persistData: 1
 --- !u!114 &1541853459
 MonoBehaviour:
   m_ObjectHideFlags: 0
