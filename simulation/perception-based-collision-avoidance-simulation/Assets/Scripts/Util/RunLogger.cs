@@ -4,7 +4,7 @@ using System.IO;
 using Newtonsoft.Json;
 using UnityEngine;
 
-// Run metadata and the Unity-side logs of a run (step 4.7): run.json, copies of the configuration used, the commands
+// Run metadata and the Unity-side logs of a run (step 4.7): run.json, copies of the configuration used (sensors and, since 8.1, the resolved scenario), the commands
 // as applied by the executor, and frame times. Ground truth is written into the same folder by GroundTruthLogger.
 // Nothing is opened until the processor has said (READY) whether there is a run folder; without one this component
 // switches itself off.
@@ -63,6 +63,8 @@ public class RunLogger : MonoBehaviour
         startedLocal = System.DateTime.Now.ToString("o");
         startedUtc = System.DateTime.UtcNow.ToString("o");
         File.WriteAllText(Path.Combine(RunFolder.ConfigCopyDir, "sensors_resolved.json"), SensorConfigLoader.ToJson(rig.Config));
+        if (ScenarioContext.Loaded && ScenarioContext.ResolvedJson != null)
+            File.WriteAllText(Path.Combine(RunFolder.ConfigCopyDir, "scenario_resolved.json"), ScenarioContext.ResolvedJson);
         commands = new StreamWriter(Path.Combine(RunFolder.UnityDir, "commands.csv"));
         commands.WriteLine("t,status,rule,last_id,applied_accel,remaining");
         frames = new StreamWriter(Path.Combine(RunFolder.UnityDir, "frames.csv"));
@@ -127,7 +129,7 @@ public class RunLogger : MonoBehaviour
         {
             { "formatVersion", 1 },
             { "runId", RunFolder.RunId },
-            { "scenario", scenarioName },
+            { "scenario", ScenarioContext.Loaded ? ScenarioContext.Config.name : scenarioName },
             { "startedLocal", startedLocal },
             { "startedUtc", startedUtc },
             { "sensorConfig", rig.Config.name },
@@ -142,6 +144,12 @@ public class RunLogger : MonoBehaviour
             { "cpuThreads", SystemInfo.processorCount },
             { "commandLine", SafeCommandLine() },
         };
+        if (ScenarioContext.Loaded)
+        {
+            run["scenarioFile"] = ScenarioContext.SourcePath;
+            run["scenarioOverrides"] = ScenarioContext.Overrides;
+            run["systemVariant"] = ScenarioContext.Config.systemVariant;
+        }
         if (final)
         {
             var end = new Dictionary<string, object>

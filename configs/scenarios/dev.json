@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "name": "dev",
+  "description": "The development test scene (crossing vehicle, walking pedestrian, parked car with a person, crate). These values equal the ones set in the scene, so using this file changes nothing; it is the reference for the format.",
+  "scene": "DevTestScene",
+  "systemVariant": "default",
+  "driver": {
+    "route": "routes/dev_straight.json",
+    "cruiseSpeedMps": 13.9
+  },
+  "sensors": {
+    "config": "default",
+    "seed": 12345
+  },
+  "environment": {
+    "fogVisibilityM": 0
+  },
+  "objects": {
+    "CrossingVehicle": { "speedMps": 5.0, "startDelayS": 5.1 },
+    "WalkingPedestrian": { "speedMps": 1.4, "startDelayS": 0.0 }
+  },
+  "end": {
+    "timeoutS": 60
+  }
+}
