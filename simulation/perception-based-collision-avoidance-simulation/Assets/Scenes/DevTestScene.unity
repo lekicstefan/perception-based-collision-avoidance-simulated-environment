@@ -1789,7 +1789,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RouteDriver
   vehicle: {fileID: 1128943756}
   routeFile: routes/dev_straight.json
-  cruiseSpeed: 8
+  cruiseSpeed: 13.9
   maxLateralAccel: 3
   comfortDecel: 2
   comfortAccel: 1.5

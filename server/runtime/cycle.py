@@ -110,6 +110,7 @@ class CycleRunner:
                 if cmd is not None:
                     self.command_table.row(cycle, round(t0 - t_begin, 6), *dataclasses.astuple(cmd))
             cycle += 1
+            self.duration = time.perf_counter() - t_begin          # kept up to date: an interrupted run (Ctrl+C) still reports its real length
 
             if self.realtime:
                 next_tick += self.period

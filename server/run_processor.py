@@ -10,6 +10,7 @@
   python -m server.run_processor --pose-sigma-m 0.05 --pose-sigma-yaw-deg 0.5  # tell the tracker and the risk stage the pose noise of the simulation
   python -m server.run_processor --no-double-count                             # reachable radius without the present position sigma (7.9, off by default)
   python -m server.run_processor --pin 2,4                                     # pin this process to logical CPUs 2 and 4 and give it high priority (section 4.2)
+  python -m server.run_processor --passing-speed-kmh 40                        # speed at which hazards that are only a precaution are passed (default 40, 0 = the occluded approach speed of the risk level)
   python -m server.run_processor --max-scans-per-cycle 0                       # no load shedding (default 2: at most the two newest scans per cycle, see shedding.py)
 
 Live: start this first, then press Play in Unity. With --run-dir the processor chooses the folder and tells Unity in
@@ -27,6 +28,7 @@ from server.recording.run_log import RunLog
 from server.recording.stream_log import StreamRecorder
 from server.runtime.cycle import CycleRunner
 from server.risk.cause_log import CauseLog
+from server.risk.decision import DecisionConfig
 from server.risk.hazards import HazardConfig
 from server.risk.stage import StageConfig
 from server.runtime.pinning import parse_cpu_list, pin_process
@@ -51,11 +53,15 @@ def main() -> None:
     ap.add_argument("--pin", default=None, metavar="CPUS", help="pin this process to these logical CPUs and give it high priority, for example 2,4 or 2-5 (section 4.2: the processor and Unity run on separate cores in every timing experiment)")
     ap.add_argument("--max-scans-per-cycle", type=int, default=SheddingConfig().max_scans_per_cycle, metavar="N",
                     help="load shedding: when more scans are waiting, only the N newest are processed and the older ones are skipped and counted; 0 = never skip")
+    ap.add_argument("--passing-speed-kmh", type=float, default=40.0, metavar="KMH",
+                    help="speed at which the car passes a hazard that is only a precaution (a person beside the road, a hidden strip beside a parked car): its caps are never below it; 0 = the occluded approach speed of the risk level (the earlier behaviour)")
     args = ap.parse_args()
     if args.pose_sigma_m < 0.0 or args.pose_sigma_yaw_deg < 0.0:
         ap.error("the pose noise cannot be negative")
     if args.max_scans_per_cycle < 0:
         ap.error("--max-scans-per-cycle cannot be negative")
+    if args.passing_speed_kmh < 0.0:
+        ap.error("--passing-speed-kmh cannot be negative")
     pin_info = None
     if args.pin is not None:
         try:
@@ -68,11 +74,13 @@ def main() -> None:
 
     link = ReplayLink(args.replay, speed=args.speed, period=1.0 / args.rate) if replay else Link(oracle=args.oracle)
     config = ProcessorConfig(sigma_extent_across_m=args.extent_across_m, pose_position_sigma_m=args.pose_sigma_m, pose_yaw_sigma_rad=math.radians(args.pose_sigma_yaw_deg),
-                             stage=StageConfig(hazard=HazardConfig(subtract_current_sigma=args.no_double_count)))
+                             stage=StageConfig(hazard=HazardConfig(subtract_current_sigma=args.no_double_count),
+                                               decision=DecisionConfig(passing_speed_mps=args.passing_speed_kmh / 3.6)))
     processor = PipelineProcessor(config)
     print(f"pose noise: position {args.pose_sigma_m:g} m, heading {args.pose_sigma_yaw_deg:g} deg"
           f"{' (no pose noise told to the tracker)' if args.pose_sigma_m == 0.0 and args.pose_sigma_yaw_deg == 0.0 else ''}; "
           f"covariance in the reachable radius: {'growth only' if args.no_double_count else 'full (default)'}")
+    print(f"passing speed for precaution hazards: {args.passing_speed_kmh:g} km/h" + (" (off: the occluded approach speed of the risk level)" if args.passing_speed_kmh == 0.0 else ""))
     processor.telemetry_sink = getattr(link, "send_telemetry", None)          # the replay link has none: no telemetry then
     run_log = recorder = runner = boundary = None
     try:
@@ -127,7 +135,7 @@ def main() -> None:
         if run_log is not None:
             if processor.log is not None:
                 processor.log.close()
-            run_log.write_summary(pin=pin_info, cycle=runner.stats() if runner else None,
+            run_log.write_summary(pin=pin_info, passing_speed_kmh=args.passing_speed_kmh, cycle=runner.stats() if runner else None,
                                   streams={n: dataclasses.asdict(s) for n, s in link.stats.items()},
                                   calibration_id=link.calibration_id, ended=link.ended, end_sim_time=link.end_sim_time,
                                   malformed_messages=link.error_count, first_errors=link.errors[:5],

@@ -11,6 +11,7 @@ import time
 
 from server.communication import protocol as P
 from server.runtime.cycle import CycleRunner, Processor
+from server.runtime.shedding import SheddingConfig
 from server.recording.stream_log import iter_records, resolve_stream_path
 from server.communication.transport import Incoming, Link, StreamStats
 
@@ -94,10 +95,13 @@ class ReplayLink:
         pass
 
 
-def process_recording(path, processor: Processor, rate_hz: float = 30.0, speed: float = 0.0, run_log=None):
-    """Offline processing mode: runs a processor over a recording. Returns (runner, link)."""
+def process_recording(path, processor: Processor, rate_hz: float = 30.0, speed: float = 0.0, run_log=None, shedding: SheddingConfig | None = None):
+    """Offline processing mode: runs a processor over a recording. Returns (runner, link).
+    Nothing is skipped by default: offline processing reproduces the whole recording (a replay that is faster than real time is a burst, not an overload).
+    Pass a SheddingConfig to process it the way the live system would."""
     link = ReplayLink(path, speed=speed, period=1.0 / rate_hz)
     link.handshake(warmup=processor.warmup)
-    runner = CycleRunner(link, processor, rate_hz=rate_hz, run_log=run_log, realtime=speed > 0)
+    shedding = shedding if shedding is not None else SheddingConfig(max_scans_per_cycle=0)
+    runner = CycleRunner(link, processor, rate_hz=rate_hz, run_log=run_log, realtime=speed > 0, shedding=shedding)
     runner.run()
     return runner, link

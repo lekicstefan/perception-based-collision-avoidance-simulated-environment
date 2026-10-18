@@ -14,7 +14,7 @@ public class GroundTruthLogger : MonoBehaviour
     public string runName = "";           // empty = date and time
     public int logEveryNSteps = 1;        // 1 = every physics step
     public bool useRunFolder = true;
-    public bool persistData = false;
+    public bool persistData = true;       // every evaluation run needs the ground truth; it is written only when the processor started a run folder
 
     StreamWriter ego, haz, vis, info;
     readonly HashSet<int> infoWritten = new HashSet<int>();

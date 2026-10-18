@@ -11,6 +11,38 @@ using UnityEngine;
 [DefaultExecutionOrder(50)]   // after the executor (5) and the ground-truth logger (30)
 public class RunLogger : MonoBehaviour
 {
+    // The command line without anything that could be a credential: Unity Hub passes the editor a session token (-accessToken) and similar
+    // arguments, and run.json must be safe to share. Kept: the executable, our own arguments (--name value) and a few harmless Unity arguments;
+    // everything else is only counted.
+    static readonly HashSet<string> SafeUnityArgs = new HashSet<string>
+    {
+        "-batchmode", "-nographics", "-screen-width", "-screen-height", "-screen-fullscreen", "-logFile", "-projectPath"
+    };
+
+    static string SafeCommandLine()
+    {
+        string[] args = System.Environment.GetCommandLineArgs();
+        var kept = new List<string>();
+        int omitted = 0;
+        for (int i = 0; i < args.Length; i++)
+        {
+            string a = args[i];
+            if (i == 0) { kept.Add(a); continue; }
+            bool keep = a.StartsWith("--") || SafeUnityArgs.Contains(a);
+            bool hasValue = i + 1 < args.Length && !args[i + 1].StartsWith("-");
+            if (!keep)
+            {
+                omitted++;
+                if (hasValue) i++;          // its value goes with it
+                continue;
+            }
+            kept.Add(a);
+            if (hasValue) { kept.Add(args[i + 1]); i++; }
+        }
+        if (omitted > 0) kept.Add("(+" + omitted + " other Unity arguments omitted)");
+        return string.Join(" ", kept);
+    }
+
     public SensorRig rig;
     public CommandExecutor executor;
     public CalibrationProvider calibration;
@@ -108,7 +140,7 @@ public class RunLogger : MonoBehaviour
             { "graphicsDevice", SystemInfo.graphicsDeviceName },
             { "cpu", SystemInfo.processorType },
             { "cpuThreads", SystemInfo.processorCount },
-            { "commandLine", string.Join(" ", System.Environment.GetCommandLineArgs()) },
+            { "commandLine", SafeCommandLine() },
         };
         if (final)
         {

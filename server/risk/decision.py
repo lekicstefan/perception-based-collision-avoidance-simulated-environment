@@ -5,7 +5,10 @@ Every hazard (the conflicts of the tracks of 7.3 and the virtual hazards of 7.10
     margin       the margin of the risk level times the margin weight of the hazard (tentative track 0.5, virtual hazard 0)
     d_eff        effective_distance(d_path, ..., sigma_d, lower quantile of the lead's speed)
     caps         comfort and safety cap from d_eff; a virtual side hazard has a floor (the occluded approach speed): its caps are never below it
-    floor        the floor is a speed RELATIVE to the hazard: a precaution-only hazard that moves ahead along the path (a person walking along the
+    floor        a hazard that is only a precaution (a person beside the road that could step in, a hidden strip beside a parked car) does not stop the car:
+                 its caps are never below a floor, the PASSING SPEED (DecisionConfig.passing_speed_mps; the live system uses 40 km/h: the system
+                 reacts, it does not drive for the driver). With a passing speed of 0 the floor is the occluded approach speed of the risk level (the
+                 earlier behaviour). The floor is a speed RELATIVE to the hazard: a precaution-only hazard that moves ahead along the path (a person walking along the
                  pavement) is passed at its own speed (lower quantile) plus the floor, but only for an established track (side_floor_relative_min_age_s):
                  the velocity of a young track, such as a sliver of a standing box, is a systematic error that its covariance does not show, and it
                  must not lift the floor
@@ -13,8 +16,9 @@ Every hazard (the conflicts of the tracks of 7.3 and the virtual hazards of 7.10
                  stop: a_req = (v^2 - floor^2) / (2 (d_path - v t)) and nothing at all while v <= floor. The NOMINAL distance d_path is used here, not
                  d_eff: the caps carry margin and covariance (they start the slow-down early), and a_req only asks for more when the car physically
                  cannot get down to the floor before the conflict point. (With d_eff a car that is slightly above the floor and nearer than margin plus
-                 covariance, about 3.5 m, would be told to brake at the maximum.) A precaution-only hazard asks for no braking once the car is at its
-                 conflict point (no distance is left to slow down in, the floored caps still hold the speed)
+                 covariance, about 3.5 m, would be told to brake at the maximum.) A hazard with a floor (a precaution or a hidden strip) asks for no
+                 braking once the car is at its conflict point (no distance is left to slow down in, the floored caps still hold the speed; without this a
+                 car creeping beside a parked car and a hair above the floor was told to brake at the maximum, again and again)
 
 The command takes the lowest cap over all hazards, and the strongest regime. Each of these has a CAUSE: the hazard that set it, as a `Cause`
 (a track id, or a virtual occlusion hazard with its place), with the numbers the evaluation needs to join it with the ground truth (section 5.10:
@@ -40,6 +44,10 @@ class DecisionConfig:
     side_floor_enabled: bool = True         # a conflict that exists only because the object COULD reach the corridor (its nominal motion stays out of it:
                                             # a parked car, a person on the pavement) gets the occluded approach speed as a floor, like a hidden side strip,
                                             # so the car passes at that speed instead of stopping beside it
+    passing_speed_mps: float = 0.0          # the speed at which the car passes a hazard that is only a precaution (a person beside the road, a hidden side strip
+                                            # beside a parked car): the caps of such a hazard are never below it. 0: the occluded approach speed of the risk level
+                                            # (the earlier behaviour); the live system uses 40 km/h, see run_processor --passing-speed-kmh. A hidden corridor ahead
+                                            # (blind corridor) and an object in the lane keep their stop distance
     side_floor_relative: bool = True        # the floor is raised by the hazard's own speed along the path (lower quantile) ...
     side_floor_relative_min_age_s: float = 3.0      # ... but only for a track at least this old (a sliver of a standing box lives a few scans)
     emergency_needs_physical: bool = True   # an emergency is flagged only when the car cannot stop before the hazard at the maximum deceleration even
@@ -143,8 +151,9 @@ def respond_to_hazard(conflict: Conflict, speed_mps: float, params: StoppingPara
     if relative_floor_min_age_s is not None and conflict.age_s >= relative_floor_min_age_s:
         floor_mps += v_low      # the floor is a speed RELATIVE to the hazard: one that moves ahead along the path is passed at its own speed plus the floor
     a_req = required_deceleration_to(speed_mps, floor_mps, conflict.d_path_m, p.delay_s)      # nominal distance: the margin is in the caps (see above)
-    if not conflict.in_corridor and conflict.d_path_m - speed_mps * p.delay_s <= 0.0:
-        a_req = 0.0             # a precaution only, and the car is already at the conflict point: nothing is left to brake for, the floored caps hold the speed
+    if conflict.d_path_m - speed_mps * p.delay_s <= 0.0:
+        a_req = 0.0             # a hazard with a floor (a precaution, a hidden strip) and the car is already at its conflict point: nothing is left to brake for,
+                                # the floored caps hold the speed
     regime, brake, emergency = classify(a_req, p)
     return HazardResponse(conflict, kind, label, floor_mps, d_eff, max(r.comfort_cap, floor_mps), max(r.safety_cap, floor_mps), a_req, regime,
                           brake, emergency)
@@ -173,9 +182,12 @@ def _soften(r: HazardResponse, speed_mps: float, params: StoppingParams, cfg: De
 def decide(t: float, speed_mps: float, conflicts: list, virtuals: list, params: StoppingParams, risk_level: int = 1,
            cfg: DecisionConfig = DecisionConfig(), side_floor_mps: float = 0.0) -> Decision:
     """The raw decision of a cycle from the conflicts of the tracks and the virtual hazards (nearest first or not: the order does not matter)."""
-    responses = [respond_to_hazard(c, speed_mps, params, side_floor_mps if (cfg.side_floor_enabled and not c.in_corridor) else 0.0,
+    track_floor = cfg.passing_speed_mps if cfg.passing_speed_mps > 0.0 else side_floor_mps
+    responses = [respond_to_hazard(c, speed_mps, params, track_floor if (cfg.side_floor_enabled and not c.in_corridor) else 0.0,
                                    relative_floor_min_age_s=cfg.side_floor_relative_min_age_s if cfg.side_floor_relative else None) for c in conflicts]
-    responses += [respond_to_hazard(v.conflict, speed_mps, params, v.floor_speed_mps, v.cause, "virtual") for v in virtuals]
+    responses += [respond_to_hazard(v.conflict, speed_mps, params,
+                                    cfg.passing_speed_mps if (cfg.passing_speed_mps > 0.0 and v.floor_speed_mps > 0.0) else v.floor_speed_mps,
+                                    v.cause, "virtual") for v in virtuals]
     responses = [_soften(r, speed_mps, params, cfg) for r in responses]
     if not responses:
         return Decision(t, speed_mps, cfg.ceiling_mps, cfg.ceiling_mps, NO_CAUSE, NO_CAUSE, Regime.COMFORT, 0.0, False, NO_CAUSE, int(risk_level),

@@ -6,9 +6,11 @@ from types import SimpleNamespace
 
 from server.communication import protocol as P
 from server.communication.transport import Link
+from server.recording.replay import process_recording
 from server.runtime.cycle import CycleRunner, Processor
 from server.runtime.shedding import SheddingConfig, shed
 from testing.support.fake_unity import FakeUnity
+from testing.support.synthetic_stream import write_recording
 
 _base = itertools.count(27400, 10)
 
@@ -101,3 +103,11 @@ def test_a_burst_of_scans_is_bounded_in_the_cycle_runner():
     assert processed + runner.scans_dropped == received      # every scan that arrived was either processed or counted as skipped
     assert runner.scans_dropped >= 1
     assert "load shedding (at most 2 scans per cycle)" in runner.report()
+
+
+def test_offline_processing_skips_nothing_unless_it_is_asked_to(tmp_path):
+    write_recording(tmp_path / "stream.bin")                       # 1 s of data, replayed in about 50 ms: a burst, not an overload
+    plain, _ = process_recording(tmp_path, SlowRecorder(0.0), rate_hz=30, speed=20.0)
+    assert plain.scans_dropped == 0 and plain.camera_dropped == 0
+    live_like, _ = process_recording(tmp_path, SlowRecorder(0.0), rate_hz=30, speed=20.0, shedding=SheddingConfig(max_scans_per_cycle=1))
+    assert live_like.scans_dropped > 0
