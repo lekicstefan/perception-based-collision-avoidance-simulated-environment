@@ -70,16 +70,36 @@ public class EnvironmentParams
     public float? fogVisibilityM;         // meteorological visibility, 0 = clear air
 }
 
-// A moving scene object (WaypointMover) found by the name of its GameObject. Speed profiles and triggers are added in step 8.3.
+// A moving scene object (WaypointMover) found by the name of its GameObject.
 public class ObjectParams
 {
-    public float? speedMps;
-    public float? startDelayS;
+    public float? speedMps;               // speed when it starts to move
+    public float? startDelayS;            // seconds after the run begins; not together with a trigger
     public bool? loop;
     public bool? faceDirection;
+    public TriggerParams trigger;         // start so that it reaches the conflict point at a time offset from the ego car
+    public List<MotionEventParams> events;   // speed changes; a list in the file replaces the one set in the scene
 }
 
-// When a run ends. Enforced by the scenario manager (step 8.2); only stored and checked for now.
+// Time-to-reach start trigger. The conflict point is a marker in the scene (WaypointMover.conflictPoint) unless both distances are given here.
+public class TriggerParams
+{
+    public float? arrivalOffsetS;         // the object reaches the conflict point this many seconds AFTER the front of the ego car (negative: before). Required
+    public float? egoRouteM;              // distance along the ego route of the conflict point (replaces the marker for the ego side)
+    public float? objectPathM;            // distance along the object's path of the conflict point (replaces the marker for the object side)
+}
+
+// One speed change. Exactly one of atTimeS, atPathM, afterPreviousS says when it happens.
+public class MotionEventParams
+{
+    public float? atTimeS;                // seconds since the object started to move
+    public float? atPathM;                // metres travelled along its path
+    public float? afterPreviousS;         // seconds after the previous event (after the start, for the first)
+    public float? speedMps;               // the new target speed. Required
+    public float? accelMps2;              // m/s^2 toward the new speed; missing or 0 = at once (a sudden change)
+}
+
+// When a run ends. Enforced by the scenario manager (ScenarioManager).
 public class EndParams
 {
     public float timeoutS = 120f;         // simulation time

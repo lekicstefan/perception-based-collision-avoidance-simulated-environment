@@ -21,6 +21,9 @@ public static class RunOutcome
 
     public static bool ValidForExperiments { get { return !TimeScaleChanged; } }
 
+    // What the moving objects did (start times, speed events, trigger schedule), from WaypointMover.CollectReports().
+    public static object Objects { get; private set; }
+
     public static void Reset()
     {
         Captured = false;
@@ -34,7 +37,10 @@ public static class RunOutcome
         MaxTimeScale = 1f;
         Pauses = 0;
         PausedRealS = 0.0;
+        Objects = null;
     }
+
+    public static void SetObjects(object reports) { Objects = reports; }
 
     public static void Capture(string reason, double simTime, float finalSpeedMps, float routeProgressM, float routeLengthM)
     {
@@ -80,6 +86,7 @@ public static class RunOutcome
             { "pauses", Pauses },
             { "pausedRealS", PausedRealS },
         };
+        if (Objects != null) d["objects"] = Objects;
         if (RunControl.Ended && RunControl.Reason == RunControl.EndReason.Collision)
         {
             d["impactSpeedMps"] = RunControl.ImpactSpeed;

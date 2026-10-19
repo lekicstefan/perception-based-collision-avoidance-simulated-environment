@@ -87,21 +87,46 @@ public static class ScenarioLoader
         try { value = JToken.Parse(raw); }
         catch (JsonReaderException) { value = new JValue(raw); }
 
+        // A part that is a number steps into an entry of an existing list (objects.Ped.events.0.speedMps=3). Missing groups of settings are created.
         string[] parts = path.Split('.');
-        JObject cur = root;
+        JToken cur = root;
         for (int i = 0; i + 1 < parts.Length; i++)
         {
-            JToken next = cur[parts[i]];
-            if (next == null || next.Type == JTokenType.Null)
+            string part = parts[i];
+            JToken next;
+            if (cur is JArray)
             {
-                next = new JObject();
-                cur[parts[i]] = next;
+                var arr = (JArray)cur;
+                int idx;
+                if (!int.TryParse(part, out idx) || idx < 0 || idx >= arr.Count)
+                    throw new ArgumentException("--set " + spec + ": '" + part + "' is not the number of an existing entry (the list has " + arr.Count + ", counted from 0)");
+                next = arr[idx];
             }
-            else if (!(next is JObject))
-                throw new ArgumentException("--set " + spec + ": '" + parts[i] + "' is not a group of settings");
-            cur = (JObject)next;
+            else
+            {
+                var obj = (JObject)cur;
+                next = obj[part];
+                if (next == null || next.Type == JTokenType.Null)
+                {
+                    next = new JObject();
+                    obj[part] = next;
+                }
+            }
+            if (!(next is JObject) && !(next is JArray))
+                throw new ArgumentException("--set " + spec + ": '" + part + "' is not a group of settings");
+            cur = next;
         }
-        cur[parts[parts.Length - 1]] = value;
+
+        string last = parts[parts.Length - 1];
+        if (cur is JArray)
+        {
+            var arr = (JArray)cur;
+            int idx;
+            if (!int.TryParse(last, out idx) || idx < 0 || idx >= arr.Count)
+                throw new ArgumentException("--set " + spec + ": '" + last + "' is not the number of an existing entry (the list has " + arr.Count + ", counted from 0)");
+            arr[idx] = value;
+        }
+        else ((JObject)cur)[last] = value;
     }
 
     static void Validate(ScenarioConfig c, string fileStem)
@@ -122,14 +147,45 @@ public static class ScenarioLoader
         if (c.sensors.seed.HasValue && c.sensors.seed.Value < 0) throw new ArgumentException("Scenario '" + c.name + "': sensors.seed must be 0 or more");
         if (c.objects != null)
             foreach (var kv in c.objects)
-            {
-                if (kv.Value == null) continue;
-                NonNegative(c, "objects." + kv.Key + ".speedMps", kv.Value.speedMps);
-                NonNegative(c, "objects." + kv.Key + ".startDelayS", kv.Value.startDelayS);
-            }
+                if (kv.Value != null) ValidateObject(c, kv.Key, kv.Value);
         if (c.end.timeoutS <= 0f) throw new ArgumentException("Scenario '" + c.name + "': end.timeoutS must be above 0");
         if (c.end.stoppedForS < 0f) throw new ArgumentException("Scenario '" + c.name + "': end.stoppedForS must be 0 or more");
         if (c.end.stoppedSpeedMps < 0f) throw new ArgumentException("Scenario '" + c.name + "': end.stoppedSpeedMps must be 0 or more");
+    }
+
+    static void ValidateObject(ScenarioConfig c, string name, ObjectParams o)
+    {
+        string p = "objects." + name;
+        NonNegative(c, p + ".speedMps", o.speedMps);
+        NonNegative(c, p + ".startDelayS", o.startDelayS);
+
+        if (o.trigger != null)
+        {
+            if (!o.trigger.arrivalOffsetS.HasValue)
+                throw new ArgumentException("Scenario '" + c.name + "': " + p + ".trigger needs arrivalOffsetS");
+            if (o.startDelayS.HasValue)
+                throw new ArgumentException("Scenario '" + c.name + "': " + p + " has both startDelayS and a trigger. With a trigger the start time is computed, remove startDelayS");
+            NonNegative(c, p + ".trigger.egoRouteM", o.trigger.egoRouteM);
+            NonNegative(c, p + ".trigger.objectPathM", o.trigger.objectPathM);
+        }
+
+        if (o.events != null)
+            for (int i = 0; i < o.events.Count; i++)
+            {
+                MotionEventParams e = o.events[i];
+                string ep = p + ".events[" + i + "]";
+                if (e == null) throw new ArgumentException("Scenario '" + c.name + "': " + ep + " is empty");
+                int when = (e.atTimeS.HasValue ? 1 : 0) + (e.atPathM.HasValue ? 1 : 0) + (e.afterPreviousS.HasValue ? 1 : 0);
+                if (when != 1)
+                    throw new ArgumentException("Scenario '" + c.name + "': " + ep + " needs exactly one of atTimeS, atPathM, afterPreviousS (has " + when + ")");
+                if (!e.speedMps.HasValue)
+                    throw new ArgumentException("Scenario '" + c.name + "': " + ep + " needs speedMps");
+                NonNegative(c, ep + ".atTimeS", e.atTimeS);
+                NonNegative(c, ep + ".atPathM", e.atPathM);
+                NonNegative(c, ep + ".afterPreviousS", e.afterPreviousS);
+                NonNegative(c, ep + ".speedMps", e.speedMps);
+                NonNegative(c, ep + ".accelMps2", e.accelMps2);
+            }
     }
 
     static void Positive(ScenarioConfig c, string label, float? v)

@@ -162,7 +162,43 @@ public class ScenarioSettings : MonoBehaviour
                 Set(o.startDelayS, ref m.startDelay);
                 Set(o.loop, ref m.loop);
                 Set(o.faceDirection, ref m.faceDirection);
+                if (o.trigger != null)
+                {
+                    m.useTrigger = true;
+                    Set(o.trigger.arrivalOffsetS, ref m.arrivalOffset);
+                    Set(o.trigger.egoRouteM, ref m.egoRouteM);
+                    Set(o.trigger.objectPathM, ref m.objectPathM);
+                }
+                if (o.events != null) m.events = ToEvents(o.events);
             }
+    }
+
+    static List<MotionEvent> ToEvents(List<MotionEventParams> src)
+    {
+        var list = new List<MotionEvent>();
+        foreach (MotionEventParams p in src)
+        {
+            var e = new MotionEvent { speed = p.speedMps.Value, accel = p.accelMps2 ?? 0f };
+            if (p.atTimeS.HasValue) { e.timing = MotionEvent.Timing.AtTime; e.value = p.atTimeS.Value; }
+            else if (p.atPathM.HasValue) { e.timing = MotionEvent.Timing.AtPath; e.value = p.atPathM.Value; }
+            else { e.timing = MotionEvent.Timing.AfterPrevious; e.value = p.afterPreviousS.Value; }
+            list.Add(e);
+        }
+        return list;
+    }
+
+    static List<MotionEventParams> FromEvents(List<MotionEvent> src)
+    {
+        var list = new List<MotionEventParams>();
+        foreach (MotionEvent e in src)
+        {
+            var p = new MotionEventParams { speedMps = e.speed, accelMps2 = e.accel };
+            if (e.timing == MotionEvent.Timing.AtTime) p.atTimeS = e.value;
+            else if (e.timing == MotionEvent.Timing.AtPath) p.atPathM = e.value;
+            else p.afterPreviousS = e.value;
+            list.Add(p);
+        }
+        return list;
     }
 
     // The value of every setting as it is now (after Awake of every component), with nothing left out.
@@ -207,18 +243,30 @@ public class ScenarioSettings : MonoBehaviour
         r.environment.fogVisibilityM = SimEnvironment.FogVisibilityM;
 
         foreach (KeyValuePair<string, WaypointMover> kv in movers)
-            r.objects[kv.Key] = new ObjectParams
+        {
+            WaypointMover m = kv.Value;
+            var o = new ObjectParams
             {
-                speedMps = kv.Value.speed,
-                startDelayS = kv.Value.startDelay,
-                loop = kv.Value.loop,
-                faceDirection = kv.Value.faceDirection
+                speedMps = m.speed,
+                loop = m.loop,
+                faceDirection = m.faceDirection,
+                events = m.events != null && m.events.Count > 0 ? FromEvents(m.events) : null
             };
+            if (m.useTrigger)       // with a trigger the start time is computed (see run.json, end.outcome.objects), startDelayS does not apply
+                o.trigger = new TriggerParams
+                {
+                    arrivalOffsetS = m.arrivalOffset,
+                    egoRouteM = m.egoRouteM >= 0f ? (float?)m.egoRouteM : null,
+                    objectPathM = m.objectPathM >= 0f ? (float?)m.objectPathM : null
+                };
+            else o.startDelayS = m.startDelay;
+            r.objects[kv.Key] = o;
+        }
         return r;
     }
 
     // A scenario that cannot be used stops the run (editor: leaves play mode), so nothing runs under the wrong parameters.
-    static void Fail(Exception e)
+    public static void Fail(Exception e)
     {
         UnityEngine.Debug.LogError("SCENARIO ERROR: " + e.Message + "\nThe run is stopped.");
 #if UNITY_EDITOR

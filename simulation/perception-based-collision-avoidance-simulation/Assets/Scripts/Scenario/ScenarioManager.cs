@@ -141,6 +141,7 @@ public class ScenarioManager : MonoBehaviour
         float progress = driver != null ? driver.S : 0f;
         float length = driver != null && driver.Track != null ? driver.Track.Length : 0f;
         RunOutcome.Capture(RunControl.Reason.ToString(), RunControl.EndTime, vehicle.Speed, progress, length);
+        RunOutcome.SetObjects(WaypointMover.CollectReports());
 
         endText = RunControl.Reason + " at " + RunControl.EndTime.ToString("F2") + " s";
         if (RunControl.Reason == RunControl.EndReason.Collision)
