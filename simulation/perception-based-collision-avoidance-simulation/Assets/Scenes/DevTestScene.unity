@@ -3297,8 +3297,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScenarioSettings
   scenario: dev
-  editorOverrides:
-  - objects.CrossingVehicle.startDelayS=2
+  editorOverrides: []
   vehicle: {fileID: 0}
   driver: {fileID: 0}
   executor: {fileID: 0}

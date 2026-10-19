@@ -41,6 +41,9 @@ public class LidarSensor : MonoBehaviour
     public Vector3 LastOrigin { get { return lastOrigin; } }
     public Vector3 CellDirectionWorld(int i) { return lastRot * localDirs[i]; }
 
+    // Debug view only (ViewControls): 0 no return or sky, 1 ground-like surface, 2 other surface, for the last scan. Never sent to the processor.
+    public byte CellClass(int i) { return debugClass != null ? debugClass[i] : (byte)0; }
+
     void Start()
     {
         cfg = rig.Config.lidar;
