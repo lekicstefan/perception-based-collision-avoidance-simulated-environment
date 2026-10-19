@@ -23,4 +23,11 @@ public static class Cli
         for (int i = 0; i + 1 < a.Length; i++) if (a[i] == key) values.Add(a[i + 1]);
         return values;
     }
+
+    // a flag without a value: --quit-on-end
+    public static bool Has(string flag)
+    {
+        foreach (string a in System.Environment.GetCommandLineArgs()) if (a == flag) return true;
+        return false;
+    }
 }

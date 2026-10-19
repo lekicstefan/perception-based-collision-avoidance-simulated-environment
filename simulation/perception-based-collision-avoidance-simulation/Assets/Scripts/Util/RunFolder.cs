@@ -19,7 +19,10 @@ public static class RunFolder
     public static string ConfigCopyDir { get { return Sub("config"); } }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetForNewPlaySession() { dir = null; RunId = null; Current = State.Unknown; }   // domain reload may be off
+    static void ResetForNewPlaySession() { Reset(); }   // domain reload may be off
+
+    // Also called by the ScenarioManager whenever a scene (re)loads: a new run has no run folder until the processor says so (READY).
+    public static void Reset() { dir = null; RunId = null; Current = State.Unknown; }
 
     // Called once by NetworkHost: with the path from READY, or null when there is no run folder.
     public static void Configure(string path)

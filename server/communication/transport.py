@@ -80,7 +80,7 @@ class Link:
         self.cmd = self.ctx.socket(zmq.PUB)
         self.cmd.setsockopt(zmq.SNDHWM, COMMAND_HWM)
         self.cmd.setsockopt(zmq.LINGER, 200)
-        self.cmd.bind(f"tcp://{host}:{self.ports['command']}")
+        self._bind_with_retry(self.cmd, f"tcp://{host}:{self.ports['command']}")
 
         names = ["session", "lidar", "camera", "pose"] + (["oracle"] if oracle else [])   # no oracle socket in normal mode
         self.subs: dict[str, zmq.Socket] = {}
@@ -104,10 +104,24 @@ class Link:
         self.end_sim_time: float | None = None
         self.errors: list[str] = []
         self.error_count = 0
+        self.ignored_before_hello = 0        # leftovers of an earlier Unity run (run_processor --loop), see _receive
         self._pending: list[Incoming] = []
         self._last_session = time.monotonic()
         self.recorder = None                 # StreamRecorder, see attach_recorder()
         self._rec_buffer: list | None = None # (arrival time, raw) kept during the handshake, before the run folder is known
+
+    @staticmethod
+    def _bind_with_retry(sock, address: str, timeout: float = 10.0) -> None:
+        """After a run the previous Link may still be closing its socket (run_processor --loop): a busy port is retried for a while."""
+        t0 = time.monotonic()
+        while True:
+            try:
+                sock.bind(address)
+                return
+            except zmq.ZMQError as e:
+                if e.errno != zmq.EADDRINUSE or time.monotonic() - t0 > timeout:
+                    raise
+                time.sleep(0.2)
 
     # ------------------------------------------------------------------ receiving
 
@@ -149,6 +163,12 @@ class Link:
                     h = P.parse_header(raw)
                     if h.type not in EXPECTED[name]:
                         raise P.ProtocolError(f"{h.type.name} message on the {name} socket")
+                    if self.hello is None and not (name == "session" and h.type == P.MsgType.HELLO):
+                        # A run always begins with HELLO, and no data flows before READY. Anything that arrives earlier belongs to a
+                        # Unity run that is already over or still going (the stale END_OF_RUN copies of the run before, or the
+                        # stream of a run that another processor run answered): it must not end or feed this run.
+                        self.ignored_before_hello += 1
+                        continue
                     if name == "session":
                         self._handle_session(h, raw)
                         continue
@@ -238,6 +258,8 @@ class Link:
                          f"out of order {s.out_of_order}  gaps: {gaps}")
         lines.append(f"calibration id {self.calibration_id}, end of run {self.ended} (sim time {self.end_sim_time}), "
                      f"{self.error_count} malformed messages")
+        if self.ignored_before_hello:
+            lines.append(f"{self.ignored_before_hello} messages ignored because they arrived before HELLO (left over from an earlier Unity run)")
         return "\n".join(lines)
 
     def close(self) -> None:

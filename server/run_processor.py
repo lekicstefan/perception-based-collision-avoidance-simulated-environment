@@ -12,6 +12,7 @@
   python -m server.run_processor --pin 2,4                                     # pin this process to logical CPUs 2 and 4 and give it high priority (section 4.2)
   python -m server.run_processor --passing-speed-kmh 40                        # speed at which hazards that are only a precaution are passed (default 40, 0 = the occluded approach speed of the risk level)
   python -m server.run_processor --max-scans-per-cycle 0                       # no load shedding (default 2: at most the two newest scans per cycle, see shedding.py)
+  python -m server.run_processor --loop --run-dir mytest                       # one run after another: after END_OF_RUN (or a lost link) wait for the next Unity run (restart or another scenario); runs/mytest, mytest_2, ...
 
 Live: start this first, then press Play in Unity. With --run-dir the processor chooses the folder and tells Unity in
 the READY message, so Unity writes its logs into the same folder. Without --run-dir neither side writes a run folder
@@ -20,6 +21,7 @@ the READY message, so Unity writes its logs into the same folder. Without --run-
 import argparse
 import dataclasses
 import math
+import time
 
 from server.communication.boundary import check_stream
 from server.communication.transport import Link, LinkTimeout
@@ -34,6 +36,9 @@ from server.risk.stage import StageConfig
 from server.runtime.pinning import parse_cpu_list, pin_process
 from server.runtime.pipeline_processor import PipelineProcessor, ProcessorConfig
 from server.runtime.shedding import SheddingConfig
+
+
+LOOP_PAUSE_S = 1.5      # --loop: pause between two runs. Unity sends END_OF_RUN five times over 0.4 s and then closes its sockets.
 
 
 def main() -> None:
@@ -55,6 +60,8 @@ def main() -> None:
                     help="load shedding: when more scans are waiting, only the N newest are processed and the older ones are skipped and counted; 0 = never skip")
     ap.add_argument("--passing-speed-kmh", type=float, default=40.0, metavar="KMH",
                     help="speed at which the car passes a hazard that is only a precaution (a person beside the road, a hidden strip beside a parked car): its caps are never below it; 0 = the occluded approach speed of the risk level (the earlier behaviour)")
+    ap.add_argument("--loop", action="store_true",
+                    help="keep running: when a run ends (END_OF_RUN, a lost link) wait for the next run instead of exiting, so Unity can restart or switch scenarios. Each run gets its own run folder (NAME, NAME_2, ...). Stop with Ctrl+C. Not for --replay")
     args = ap.parse_args()
     if args.pose_sigma_m < 0.0 or args.pose_sigma_yaw_deg < 0.0:
         ap.error("the pose noise cannot be negative")
@@ -62,6 +69,8 @@ def main() -> None:
         ap.error("--max-scans-per-cycle cannot be negative")
     if args.passing_speed_kmh < 0.0:
         ap.error("--passing-speed-kmh cannot be negative")
+    if args.loop and args.replay is not None:
+        ap.error("--loop does not work with --replay")
     pin_info = None
     if args.pin is not None:
         try:
@@ -69,19 +78,39 @@ def main() -> None:
         except (ValueError, OSError, NotImplementedError) as e:
             ap.error(f"--pin: {e}")
         print(f"pinned to logical CPUs {pin_info['cpus']} (mask 0x{pin_info['mask']:X}), priority {pin_info['priority']}")
-    replay = args.replay is not None
-    logging_on = args.run_dir is not None
-
-    link = ReplayLink(args.replay, speed=args.speed, period=1.0 / args.rate) if replay else Link(oracle=args.oracle)
     config = ProcessorConfig(sigma_extent_across_m=args.extent_across_m, pose_position_sigma_m=args.pose_sigma_m, pose_yaw_sigma_rad=math.radians(args.pose_sigma_yaw_deg),
                              stage=StageConfig(hazard=HazardConfig(subtract_current_sigma=args.no_double_count),
                                                decision=DecisionConfig(passing_speed_mps=args.passing_speed_kmh / 3.6)))
-    processor = PipelineProcessor(config)
     print(f"pose noise: position {args.pose_sigma_m:g} m, heading {args.pose_sigma_yaw_deg:g} deg"
           f"{' (no pose noise told to the tracker)' if args.pose_sigma_m == 0.0 and args.pose_sigma_yaw_deg == 0.0 else ''}; "
           f"covariance in the reachable radius: {'growth only' if args.no_double_count else 'full (default)'}")
     print(f"passing speed for precaution hazards: {args.passing_speed_kmh:g} km/h" + (" (off: the occluded approach speed of the risk level)" if args.passing_speed_kmh == 0.0 else ""))
+    runs = 0
+    try:
+        while True:
+            runs += 1
+            if args.loop:
+                print(f"\n=================== run {runs} ===================")
+            status = run_once(args, config, pin_info)
+            if not args.loop or status == "interrupted":
+                break
+            time.sleep(LOOP_PAUSE_S)       # the old Unity run is still sending its last END_OF_RUN copies and closing its sockets
+    except KeyboardInterrupt:
+        print("interrupted")
+    if args.loop:
+        print(f"\n{runs} run(s) handled")
+
+
+def run_once(args, config, pin_info) -> str:
+    """One run: handshake, processing cycles until END_OF_RUN, reports, logs. Returns "ended", "timeout" (the link died) or "interrupted" (Ctrl+C).
+    Everything of a run is created here (link, processor, run folder), so the next run starts from nothing."""
+    replay = args.replay is not None
+    logging_on = args.run_dir is not None
+
+    link = ReplayLink(args.replay, speed=args.speed, period=1.0 / args.rate) if replay else Link(oracle=args.oracle)
+    processor = PipelineProcessor(config)
     processor.telemetry_sink = getattr(link, "send_telemetry", None)          # the replay link has none: no telemetry then
+    status = "ended"
     run_log = recorder = runner = boundary = None
     try:
         run_dir = None
@@ -95,7 +124,7 @@ def main() -> None:
                 run_dir = RunLog.new_run_dir(args.run_dir)          # chosen now, sent to Unity in READY, created below
             print("waiting for HELLO from Unity (press Play now) ...")
             link.handshake(warmup=processor.warmup, buffer_for_recording=logging_on and not args.no_record,
-                           run_dir=run_dir.as_posix() if run_dir else None)
+                           run_dir=run_dir.as_posix() if run_dir else None, timeout=float("inf") if args.loop else 120.0)
 
         if run_dir is not None:
             run_log = RunLog(run_dir)
@@ -116,8 +145,10 @@ def main() -> None:
         runner.run(args.seconds)
     except KeyboardInterrupt:
         print("interrupted")
+        status = "interrupted"
     except LinkTimeout as e:
         print(f"LINK TIMEOUT: {e}")
+        status = "timeout"
     finally:
         if not replay:
             link.drain(200)
@@ -142,6 +173,7 @@ def main() -> None:
                                   recorded_messages=recorder.count if recorder else None, boundary=boundary)
             run_log.close()
         link.close()
+    return status
 
 
 if __name__ == "__main__":

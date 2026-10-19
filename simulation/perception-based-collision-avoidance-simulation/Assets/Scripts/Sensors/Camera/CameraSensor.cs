@@ -147,7 +147,7 @@ public class CameraSensor : MonoBehaviour
     void FixedUpdate()
     {
         if (cam == null) return;
-        double now = Time.fixedTimeAsDouble;
+        double now = SimClock.Now;
         if (!schedule.Due(now, Time.fixedDeltaTime)) return;
 
         ApplyFog();

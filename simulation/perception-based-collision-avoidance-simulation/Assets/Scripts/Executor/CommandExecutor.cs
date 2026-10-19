@@ -38,7 +38,7 @@ public class CommandExecutor : MonoBehaviour
 
     void FixedUpdate()
     {
-        double now = Time.fixedTimeAsDouble;
+        double now = SimClock.Now;
 
         // 1. the newest submitted command wins
         VehicleCommand tmp, latest = default(VehicleCommand);

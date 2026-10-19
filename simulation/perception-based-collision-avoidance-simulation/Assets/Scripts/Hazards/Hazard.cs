@@ -25,6 +25,9 @@ public class Hazard : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() { All.Clear(); nextId = 1; }
 
+    // Called by the ScenarioManager when a scene loads, so the ids of a run do not depend on how many runs came before it in this session.
+    public static void ResetIds() { nextId = 1; }
+
     void Awake()
     {
         Id = nextId++;

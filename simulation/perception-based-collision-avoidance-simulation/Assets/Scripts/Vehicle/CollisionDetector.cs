@@ -27,9 +27,9 @@ public class CollisionDetector : MonoBehaviour
         Collider[] hits = Physics.OverlapBox(center, half, t.rotation, hazardMask, QueryTriggerInteraction.Ignore);
         string hazardName = hits.Length > 0 ? hits[0].name : "unknown";
         float impact = vehicle.Speed;
-        RunControl.EndWithCollision(Time.fixedTimeAsDouble, impact, hazardName, vehicle.transform.position);
+        RunControl.EndWithCollision(SimClock.Now, impact, hazardName, vehicle.transform.position);
         vehicle.Freeze();
-        UnityEngine.Debug.Log("COLLISION at t=" + Time.fixedTimeAsDouble.ToString("F2") + " s | impact speed " +
+        UnityEngine.Debug.Log("COLLISION at t=" + SimClock.Now.ToString("F2") + " s | impact speed " +
             impact.ToString("F2") + " m/s (" + (impact * 3.6f).ToString("F1") + " km/h) | hazard '" + hazardName +
             "' | " + hits.Length + " collider(s) overlapped");
     }

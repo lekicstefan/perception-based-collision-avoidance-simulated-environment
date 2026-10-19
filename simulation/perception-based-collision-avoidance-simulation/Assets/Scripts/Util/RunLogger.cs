@@ -48,6 +48,9 @@ public class RunLogger : MonoBehaviour
     public CalibrationProvider calibration;
     public string scenarioName = "dev";
 
+    // true when nothing is left to write: the logs were closed, or never opened (no run folder, or the run ended before READY)
+    public bool IsClosed { get { return closed || !opened; } }
+
     StreamWriter commands, frames;
     readonly List<float> frameMs = new List<float>();
     string startedLocal, startedUtc;
@@ -90,7 +93,7 @@ public class RunLogger : MonoBehaviour
         }
         if (Time.timeScale <= 0f) return;     // frozen: waiting for the processor, or paused
 
-        double real = Time.realtimeSinceStartupAsDouble, sim = Time.fixedTimeAsDouble;
+        double real = Time.realtimeSinceStartupAsDouble, sim = SimClock.Now;
         float ms = Time.unscaledDeltaTime * 1000f;
         if (firstSim < 0) { firstSim = sim; firstReal = real; }
         lastSim = sim; lastReal = real;
@@ -103,7 +106,7 @@ public class RunLogger : MonoBehaviour
         if (closed || !opened) return;
         if (timeScaleDuringRun < 0f) timeScaleDuringRun = Time.timeScale;
         if (executor != null)
-            commands.WriteLine(R(Time.fixedTimeAsDouble) + "," + executor.Status + "," + executor.AppliedRule + "," +
+            commands.WriteLine(R(SimClock.Now) + "," + executor.Status + "," + executor.AppliedRule + "," +
                                executor.LastId + "," + R(executor.AppliedAccel) + "," + R(executor.Remaining));
 
         if (RunControl.Ended) { Close(); return; }
@@ -155,7 +158,7 @@ public class RunLogger : MonoBehaviour
             var end = new Dictionary<string, object>
             {
                 { "reason", reason },
-                { "simTime", RunControl.Ended ? RunControl.EndTime : Time.fixedTimeAsDouble },
+                { "simTime", RunControl.Ended ? RunControl.EndTime : SimClock.Now },
                 { "timeScaleDuringRun", timeScaleDuringRun },
             };
             if (RunControl.Ended && RunControl.Reason == RunControl.EndReason.Collision)
@@ -175,6 +178,7 @@ public class RunLogger : MonoBehaviour
                 end["frameMsMax"] = sorted[sorted.Count - 1];
                 if (lastReal > firstReal) end["simToRealRatio"] = (lastSim - firstSim) / (lastReal - firstReal);   // 1 = real time
             }
+            if (RunOutcome.Captured) end["outcome"] = RunOutcome.ToDictionary();
             run["end"] = end;
         }
         File.WriteAllText(Path.Combine(RunFolder.Dir, "run.json"), JsonConvert.SerializeObject(run, Formatting.Indented));

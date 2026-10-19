@@ -77,7 +77,7 @@ public class LidarSensor : MonoBehaviour
     void FixedUpdate()
     {
         if (!cfg.enabled) return;
-        double now = Time.fixedTimeAsDouble;
+        double now = SimClock.Now;
         if (!schedule.Due(now, Time.fixedDeltaTime)) return;
 
         var sw = System.Diagnostics.Stopwatch.StartNew();

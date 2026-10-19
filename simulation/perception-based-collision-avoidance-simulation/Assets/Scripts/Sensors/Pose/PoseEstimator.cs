@@ -66,7 +66,7 @@ public class PoseEstimator : MonoBehaviour
 
     void FixedUpdate()
     {
-        double now = Time.fixedTimeAsDouble;
+        double now = SimClock.Now;
         if (!haveOrigin)
         {
             x0 = vehicle.X; z0 = vehicle.Z; y0 = vehicle.transform.position.y; psi0 = vehicle.Heading;

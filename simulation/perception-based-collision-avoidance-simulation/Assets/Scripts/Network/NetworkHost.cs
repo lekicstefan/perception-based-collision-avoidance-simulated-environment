@@ -156,15 +156,7 @@ public class NetworkHost : MonoBehaviour
         {
             AsyncIO.ForceDotNet.Force();       // needed for NetMQ under Mono in the player (found in phase 1)
             int n = oracleMode ? 5 : 4;        // the oracle socket does not exist in normal mode
-            for (int i = 0; i < n; i++)
-            {
-                var p = new PublisherSocket();
-                p.Options.SendHighWatermark = Hwm[i];
-                p.Options.Linger = TimeSpan.FromMilliseconds(500);
-                if (i != SSession) p.Options.SendBuffer = SocketBufferBytes;
-                p.Bind("tcp://127.0.0.1:" + Ports[i]);
-                pubs[i] = p;
-            }
+            for (int i = 0; i < n; i++) pubs[i] = BindPublisher(i);
             cmd = new SubscriberSocket();
             cmd.Options.ReceiveHighWatermark = 10;
             cmd.Connect("tcp://127.0.0.1:" + Protocol.PortCommand);
@@ -181,6 +173,32 @@ public class NetworkHost : MonoBehaviour
         {
             foreach (var p in pubs) if (p != null) p.Dispose();
             if (cmd != null) cmd.Dispose();
+        }
+    }
+
+    // After a restart the previous run's sockets may still be closing: a busy port is retried for up to 10 s before it is an error.
+    PublisherSocket BindPublisher(int i)
+    {
+        string address = "tcp://127.0.0.1:" + Ports[i];
+        var waited = Stopwatch.StartNew();
+        while (true)
+        {
+            var p = new PublisherSocket();
+            p.Options.SendHighWatermark = Hwm[i];
+            p.Options.Linger = TimeSpan.FromMilliseconds(500);
+            if (i != SSession) p.Options.SendBuffer = SocketBufferBytes;
+            try
+            {
+                p.Bind(address);
+                return p;
+            }
+            catch (NetMQException e)
+            {
+                p.Dispose();
+                if (waited.ElapsedMilliseconds > 10000 || !threadAlive) throw;
+                UnityEngine.Debug.LogWarning("NetworkHost: " + Names[i] + " port is busy, retrying (the previous run is still closing): " + e.Message);
+                Thread.Sleep(200);
+            }
         }
     }
 
@@ -277,7 +295,7 @@ public class NetworkHost : MonoBehaviour
         Time.timeScale = 1f;
         if (thread == null) return;
 
-        if (started && !endRequested) RequestEndOfRun(Time.fixedTimeAsDouble);
+        if (started && !endRequested) RequestEndOfRun(SimClock.Now);
         if (started) thread.Join(1500);        // five END_OF_RUN copies take about 0.5 s
         threadAlive = false;
         thread.Join(1000);
