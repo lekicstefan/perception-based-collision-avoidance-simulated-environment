@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "name": "s7_negative_control",
+  "description": "Scenario 7: negative control, no real hazard. The ego car drives 30 km/h along a narrow street with parked cars on the right and a person standing on the pavement; an oncoming car passes in the other lane at 50 km/h. Nothing is on a collision course, so any braking beyond the comfortable level is an unjustified reaction.",
+  "scene": "S7_NegativeControl",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 8.33, "initialSpeedMps": 8.33 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "objects": {
+    "OncomingCar": { "speedMps": 13.9 }
+  },
+  "end": { "timeoutS": 60 }
+}

@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "name": "s6_narrow_street_standing",
+  "description": "Scenario 6: a person stands right next to a parked car on its road side (touching it), the ego car passes at 30 km/h in the middle of the road. Nobody moves, so this tests that the system separates the person from the parked car and does not treat the pair as one big object.",
+  "scene": "S6_NarrowStreetStanding",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 8.33, "initialSpeedMps": 8.33 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "end": { "timeoutS": 60 }
+}

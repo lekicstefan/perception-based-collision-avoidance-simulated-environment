@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "name": "s4_sudden_change",
+  "description": "Scenario 4: sudden change of behaviour. An adult walks from the right-hand pavement toward the road at 1.4 m/s, stops at the kerb edge (1.5 m along the path) for 1.5 s, then runs across at 3.5 m/s (accelerating at 6 m/s^2). The timed start makes the pedestrian reach the ego lane at the same moment as the front of the car (trigger.arrivalOffsetS = 0), counting the stop and the run. Ego 50 km/h. Same scene as scenario 4.",
+  "scene": "S4_CrossingPedestrian",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 13.9, "initialSpeedMps": 13.9 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "objects": {
+    "Pedestrian": {
+      "speedMps": 1.4,
+      "trigger": { "arrivalOffsetS": 0.0 },
+      "events": [
+        { "atPathM": 1.5, "speedMps": 0.0 },
+        { "afterPreviousS": 1.5, "speedMps": 3.5, "accelMps2": 6.0 }
+      ]
+    }
+  },
+  "end": { "timeoutS": 60 }
+}
