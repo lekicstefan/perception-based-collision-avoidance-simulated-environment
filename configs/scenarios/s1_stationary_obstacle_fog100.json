@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "name": "s1_stationary_obstacle_fog100",
+  "description": "Scenario 1 in fog (visibility 100 m): stationary car in the ego lane, 200 m from the start, approached at 50 km/h (modelled on the Euro NCAP car-to-stationary-car tests). The sweep varies the ego speed (driver.cruiseSpeedMps and initialSpeedMps together) and the fog visibility.",
+  "scene": "S1_StationaryObstacle",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 13.9, "initialSpeedMps": 13.9 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 100 },
+  "end": { "timeoutS": 60 }
+}

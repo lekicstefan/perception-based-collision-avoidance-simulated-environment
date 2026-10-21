@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "name": "s5_narrow_street",
+  "description": "Scenario 5: narrow street with cars parked along the right-hand kerb. The ego car drives 30 km/h in the middle of the road. An adult steps out between two parked cars (from behind them, so the car is hidden until the last moment) at 1.5 m/s and crosses the ego lane (trigger.arrivalOffsetS = 0, a collision course). The scripted driver does not react.",
+  "scene": "S5_NarrowStreet",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 8.33, "initialSpeedMps": 8.33 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "objects": {
+    "Pedestrian": { "speedMps": 1.5, "trigger": { "arrivalOffsetS": 0.0 } }
+  },
+  "end": { "timeoutS": 60 }
+}

@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "name": "s4_crossing_pedestrian",
+  "description": "Scenario 4: an adult walks across the road from the right-hand pavement (1.4 m/s, about 5 km/h) on a collision course with the ego car (50 km/h). The pedestrian starts so that it reaches the conflict point (the ego lane) at the same moment as the front of the car (trigger.arrivalOffsetS = 0). The sweep varies the offset, the pedestrian speed, the ego speed and the fog visibility. The scripted driver does not react.",
+  "scene": "S4_CrossingPedestrian",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 13.9, "initialSpeedMps": 13.9 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "objects": {
+    "Pedestrian": { "speedMps": 1.4, "trigger": { "arrivalOffsetS": 0.0 } }
+  },
+  "end": { "timeoutS": 60 }
+}
