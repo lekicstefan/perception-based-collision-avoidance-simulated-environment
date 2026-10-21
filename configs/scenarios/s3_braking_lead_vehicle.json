@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "name": "s3_braking_lead_vehicle",
+  "description": "Scenario 3: the lead car brakes. Both cars drive 50 km/h, the lead car 25 m ahead (pivot to pivot). After 3 s of its own time the lead car brakes at 6 m/s^2 to a stop. The scripted driver does not react, so without a working safety system the ego car hits it from behind.",
+  "scene": "S3_BrakingLeadVehicle",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 13.9, "initialSpeedMps": 13.9 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "objects": {
+    "LeadCar": {
+      "speedMps": 13.9,
+      "events": [ { "atTimeS": 3.0, "speedMps": 0.0, "accelMps2": 6.0 } ]
+    }
+  },
+  "end": { "timeoutS": 60 }
+}

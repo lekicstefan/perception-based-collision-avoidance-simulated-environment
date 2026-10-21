@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "name": "s2_slow_lead_vehicle",
+  "description": "Scenario 2: a slower car in the ego lane. The ego car (50 km/h) catches up with a lead car that drives 20 km/h, starting 30 m ahead (pivot to pivot). The lead car never brakes; the scripted driver does not react, so without a working safety system the ego car hits it from behind.",
+  "scene": "S2_SlowLeadVehicle",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 13.9, "initialSpeedMps": 13.9 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "objects": {
+    "LeadCar": { "speedMps": 5.56 }
+  },
+  "end": { "timeoutS": 60 }
+}
