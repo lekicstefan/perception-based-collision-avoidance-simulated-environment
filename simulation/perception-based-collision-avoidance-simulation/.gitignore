@@ -104,3 +104,9 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ss]ceneDependencyCache*
 *_BurstDebugInformation_DoNotShip/
 *_BackUpThisFolder_ButDontShipItWithYourGame/
+
+# Used asset packs without a licence which permits GitHub uploads
+simulation/perception-based-collision-avoidance-simulation/Assets/Asset Packs/Banana Yellow Games/
+simulation/perception-based-collision-avoidance-simulation/Assets/Asset Packs/ithappy/
+simulation/perception-based-collision-avoidance-simulation/Assets/Asset Packs/Pandazole_Ultimate_Pack/
+simulation/perception-based-collision-avoidance-simulation/Assets/Asset Packs/SimplePoly - Town Pack/

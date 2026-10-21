@@ -1,12 +1,17 @@
 using UnityEngine;
 
 // Builds a flat road ribbon from a route file. The GameObject must be at the origin with no rotation and scale 1.
+// The mesh has texture coordinates in metres: u across the road and v along it, both divided by uvTileM, so a texture
+// with one grid cell per tile looks the same on every road, whatever its length (see docs/scenery.md).
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
 public class RouteRoadMesh : MonoBehaviour
 {
     public string routeFile = "routes/dev_road.json";
     public float width = 7f;
     public float spacing = 1f;
+    public float uvTileM = 4f;       // size of one texture tile in metres
+    public float centreOffsetM = 0f; // moves the road to the LEFT of the route by this much (negative: right). 0 = the route is the centre line.
+                                     // Half a lane width (width / 4) puts the route in the right-hand lane. RouteRoadDressing and RoadsideScenery follow it.
 
     string status = "not built";
 
@@ -28,14 +33,19 @@ public class RouteRoadMesh : MonoBehaviour
         Route r = RouteIO.Build(RouteIO.Read(ConfigPaths.Resolve(routeFile)));
         int n = Mathf.CeilToInt(r.Length / spacing) + 1;
         float ds = r.Length / (n - 1);
+        float tile = Mathf.Max(0.1f, uvTileM);
 
         var verts = new Vector3[2 * n];
+        var uvs = new Vector2[2 * n];
         for (int i = 0; i < n; i++)
         {
             RouteSample smp = r.Sample(i * ds);
-            Vector3 left = new Vector3(-Mathf.Sin(smp.heading), 0f, Mathf.Cos(smp.heading)) * (0.5f * width);
-            verts[2 * i] = smp.position + left;
-            verts[2 * i + 1] = smp.position - left;
+            Vector3 l = new Vector3(-Mathf.Sin(smp.heading), 0f, Mathf.Cos(smp.heading));
+            Vector3 c = smp.position + l * centreOffsetM;
+            verts[2 * i] = c + l * (0.5f * width);
+            verts[2 * i + 1] = c - l * (0.5f * width);
+            uvs[2 * i] = new Vector2(0f, i * ds / tile);
+            uvs[2 * i + 1] = new Vector2(width / tile, i * ds / tile);
         }
         var tris = new int[(n - 1) * 6];
         for (int i = 0; i < n - 1; i++)
@@ -47,6 +57,7 @@ public class RouteRoadMesh : MonoBehaviour
 
         var mesh = new Mesh { name = "RoadRibbon" };
         mesh.vertices = verts;
+        mesh.uv = uvs;
         mesh.triangles = tris;
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
