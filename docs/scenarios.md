@@ -1,6 +1,6 @@
 # Scenarios
 
-A scenario is **one Unity scene plus one JSON file**. The world (road, parked cars, people, lamp posts, buildings) is built by hand in the editor, one scene per scenario (similar scenarios start from a copy of the same environment). The JSON file in `configs/scenarios/<name>.json` holds the parameters: speeds, timing, fog, sensor configuration, end conditions. Scenario files are committed; run folders are not.
+A scenario is **one Unity scene plus one JSON file**. The world (road, parked cars, people, lamp posts, buildings) is built in the editor, one scene per scenario. A scenario scene starts as a copy of `DevTestScene` (ego car, sensors, scenario manager and views come along): the route file gives the path, the road is built along it, the roadside scenery is generated along the road (docs/scenery.md), and the objects that belong to this scenario are placed by hand. The JSON file in `configs/scenarios/<name>.json` holds the parameters: speeds, timing, fog, sensor configuration, end conditions. Scenario files are committed; run folders are not.
 
 ## How a scene uses a scenario
 
@@ -26,7 +26,7 @@ Every key is optional. A missing key leaves the scene's own value, so a scenario
 | `description` | free text |
 | `scene` | name of the Unity scene of this scenario (required, checked at start) |
 | `systemVariant` | processor variant, `default` for now (phase 9); only recorded |
-| `driver` | `route`, `cruiseSpeedMps`, `maxLateralAccelMps2`, `comfortDecelMps2`, `comfortAccelMps2`, `speedGain`, `driverMaxBrakeMps2`, `lookaheadMinM`, `lookaheadPerSpeedS`, `lookaheadMaxM`, `endMarginM` (the scripted driver, `RouteDriver`) |
+| `driver` | `route`, `cruiseSpeedMps`, `initialSpeedMps` (speed at the start of the route, 0 or missing = from rest), `maxLateralAccelMps2`, `comfortDecelMps2`, `comfortAccelMps2`, `speedGain`, `driverMaxBrakeMps2`, `lookaheadMinM`, `lookaheadPerSpeedS`, `lookaheadMaxM`, `endMarginM` (the scripted driver, `RouteDriver`) |
 | `vehicle` | `wheelbaseM`, `maxSteeringDeg`, `maxSteeringRateDegPerS`, `maxAccelMps2`, `maxBrakeMps2`, `actuationDelayS`, `jerkLimitMps3` (`Vehicle`) |
 | `executor` | `capGain`, `enforceExpiry` (`CommandExecutor`) |
 | `sensors` | `config` (file in `configs/sensors`), `seed` (base seed of every noise generator) |
@@ -81,7 +81,7 @@ A timed start relative to the ego car: the object starts so that it reaches the 
 - The start time is computed **before the run**, in the frozen first frames, from the scripted driver: the speed profile, its P controller, and the actuation delay, jerk limit and limits of the vehicle (`EgoPrediction`). It is the schedule of a car that nobody intervenes with, so it is the same for every system variant and for the no-safety baseline. It is not re-computed from the real car, so a system that slows the car does not change when the pedestrian starts. A start time that would be before the run begins stops the run with an explanation (move the object further back, lengthen the approach or use a larger offset).
 - How well the schedule held is in `run.json`, `end.outcome.objects.<name>.trigger`: predicted and achieved arrival times and the achieved offset. The achieved ego arrival only exists when the car got to the conflict point, and it is only close to the prediction when nothing slowed the car before it.
 
-Limits: the prediction ignores steering (the route arc length is used as the distance driven), so it is a little off on tight bends; the conflict point must be before the point where the driver stops (route end minus `endMarginM`); the ego car starts at rest.
+Limits: the prediction ignores steering (the route arc length is used as the distance driven), so it is a little off on tight bends; the conflict point must be before the point where the driver stops (route end minus `endMarginM`); the ego car starts at rest or, with `driver.initialSpeedMps`, at that speed (the speed profile then starts from it, so it keeps its speed instead of braking).
 
 ## Overrides and sweep points
 
@@ -106,4 +106,4 @@ Views (`ViewControls`, debug only, never sent to the processor): `1`-`9` / `C` c
 
 - The processor assumes the braking capability measured in phase 2 (8 m/s^2, 0.15 s effective delay). `vehicle.maxBrakeMps2` and `vehicle.actuationDelayS` are in the file so that a run documents the car it used; changing them changes the car, not the processor's model.
 - The scenario does not set the processor's options (`--passing-speed-kmh`, `--pin`, pose noise sigmas). The batch runner passes those.
-- `dev` is the reference file for the development scene, `dev_trigger` tests the triggers and speed events there. The core scenarios 1 to 8 are added in step 8.5.
+- `dev` is the reference file for the development scene, `dev_trigger` tests the triggers and speed events there. The core scenarios 1 to 8 are added in step 8.5, one scene and one or more scenario files each (see `docs/scenery.md` for the scenery tools).

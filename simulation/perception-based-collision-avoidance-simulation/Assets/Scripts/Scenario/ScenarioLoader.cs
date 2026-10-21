@@ -137,6 +137,7 @@ public static class ScenarioLoader
         if (string.IsNullOrEmpty(c.scene)) throw new ArgumentException("Scenario '" + c.name + "' has no 'scene' (the name of its Unity scene)");
 
         Positive(c, "driver.cruiseSpeedMps", c.driver.cruiseSpeedMps);
+        NonNegative(c, "driver.initialSpeedMps", c.driver.initialSpeedMps);
         Positive(c, "driver.maxLateralAccelMps2", c.driver.maxLateralAccelMps2);
         Positive(c, "vehicle.wheelbaseM", c.vehicle.wheelbaseM);
         Positive(c, "vehicle.maxAccelMps2", c.vehicle.maxAccelMps2);

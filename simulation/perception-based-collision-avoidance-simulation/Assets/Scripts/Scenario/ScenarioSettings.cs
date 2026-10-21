@@ -105,6 +105,7 @@ public class ScenarioSettings : MonoBehaviour
         {
             if (!string.IsNullOrEmpty(d.route)) driver.routeFile = d.route;
             Set(d.cruiseSpeedMps, ref driver.cruiseSpeed);
+            Set(d.initialSpeedMps, ref driver.initialSpeed);
             Set(d.maxLateralAccelMps2, ref driver.maxLateralAccel);
             Set(d.comfortDecelMps2, ref driver.comfortDecel);
             Set(d.comfortAccelMps2, ref driver.comfortAccel);
@@ -216,6 +217,7 @@ public class ScenarioSettings : MonoBehaviour
 
         r.driver.route = driver.routeFile;
         r.driver.cruiseSpeedMps = driver.cruiseSpeed;
+        r.driver.initialSpeedMps = driver.initialSpeed;
         r.driver.maxLateralAccelMps2 = driver.maxLateralAccel;
         r.driver.comfortDecelMps2 = driver.comfortDecel;
         r.driver.comfortAccelMps2 = driver.comfortAccel;

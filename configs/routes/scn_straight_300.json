@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "name": "scn_straight_300",
+  "waypoints": [
+    {"x": 0, "z": 0, "elevation": 0},
+    {"x": 0, "z": 150, "elevation": 0},
+    {"x": 0, "z": 300, "elevation": 0}
+  ]
+}

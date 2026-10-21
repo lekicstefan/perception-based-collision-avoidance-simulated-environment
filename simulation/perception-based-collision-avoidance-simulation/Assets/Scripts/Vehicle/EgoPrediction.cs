@@ -9,7 +9,7 @@ using UnityEngine;
 // The time of a position is the simulation time of the step that reached it (the first step is at dt).
 public static class EgoPrediction
 {
-    // Time (s, simulation time) at which the rear axle reaches route arc length sRear, starting at rest at the start of the route.
+    // Time (s, simulation time) at which the rear axle reaches route arc length sRear, starting at the start of the route with the speed of the driver's initialSpeed (0 = at rest).
     // Throws when the point is not on the route, beyond where the driver stops, or never reached.
     public static float TimeToReach(RouteDriver driver, Vehicle vehicle, float sRear)
     {
@@ -20,12 +20,12 @@ public static class EgoPrediction
         if (sRear >= stopAt)
             throw new System.ArgumentException("EgoPrediction: the point is at route " + sRear.ToString("F1") + " m, but the driver stops at " + stopAt.ToString("F1") + " m (route length " + track.Length.ToString("F1") + " m)");
 
-        var profile = new SpeedProfile(track, driver.cruiseSpeed, driver.maxLateralAccel, driver.comfortDecel, driver.comfortAccel);
+        var profile = new SpeedProfile(track, driver.cruiseSpeed, driver.maxLateralAccel, driver.comfortDecel, driver.comfortAccel, driver.initialSpeed);
         float dt = Time.fixedDeltaTime;
         int n = Mathf.Max(0, Mathf.RoundToInt(vehicle.actuationDelay / dt));
         var delayLine = new float[n];
         int idx = 0;
-        float requested = 0f, accel = 0f, speed = 0f, s = 0f;
+        float requested = 0f, accel = 0f, speed = driver.initialSpeed, s = 0f;
         float maxJerkStep = vehicle.jerkLimit * dt;
         int maxSteps = Mathf.RoundToInt(600f / dt);
 

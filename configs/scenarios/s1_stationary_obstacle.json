@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "name": "s1_stationary_obstacle",
+  "description": "Scenario 1: stationary car in the ego lane, 200 m from the start, approached at 50 km/h (modelled on the Euro NCAP car-to-stationary-car tests). The sweep varies the ego speed (driver.cruiseSpeedMps and initialSpeedMps together) and the fog visibility.",
+  "scene": "S1_StationaryObstacle",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 13.9, "initialSpeedMps": 13.9 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "end": { "timeoutS": 60 }
+}

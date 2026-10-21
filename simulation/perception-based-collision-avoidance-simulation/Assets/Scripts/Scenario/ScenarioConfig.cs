@@ -27,6 +27,7 @@ public class DriverParams
 {
     public string route;                  // route file under configs, for example routes/dev_straight.json
     public float? cruiseSpeedMps;
+    public float? initialSpeedMps;        // speed at the start of the route (missing or 0 = starts from rest)
     public float? maxLateralAccelMps2;
     public float? comfortDecelMps2;
     public float? comfortAccelMps2;

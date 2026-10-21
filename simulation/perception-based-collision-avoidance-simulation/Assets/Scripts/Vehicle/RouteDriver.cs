@@ -9,6 +9,7 @@ public class RouteDriver : MonoBehaviour
 
     [Header("Speed")]
     public float cruiseSpeed = 14f;        // m/s, scripted speed
+    public float initialSpeed = 0f;        // m/s, speed of the car at the start of the route (0 = starts from rest)
     public float maxLateralAccel = 3f;     // m/s^2, sets curve speeds
     public float comfortDecel = 2f;        // m/s^2, slowing before curves and the end
     public float comfortAccel = 1.5f;      // m/s^2
@@ -43,10 +44,10 @@ public class RouteDriver : MonoBehaviour
     void Start()
     {
         Track = RouteIO.Build(RouteIO.Read(ConfigPaths.Resolve(routeFile)));
-        profile = new SpeedProfile(Track, cruiseSpeed, maxLateralAccel, comfortDecel, comfortAccel);
+        profile = new SpeedProfile(Track, cruiseSpeed, maxLateralAccel, comfortDecel, comfortAccel, initialSpeed);
         RouteSample s0 = Track.Sample(0f);
         vehicle.SetPose(s0.position.x, s0.position.z, s0.heading);
-        vehicle.Speed = 0f;
+        vehicle.Speed = initialSpeed;
         nextLog = logInterval;
     }
 

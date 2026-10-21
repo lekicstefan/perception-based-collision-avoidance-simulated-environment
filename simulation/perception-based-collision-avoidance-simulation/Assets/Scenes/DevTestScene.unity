@@ -3970,6 +3970,7 @@ MonoBehaviour:
   vehicle: {fileID: 1128943756}
   routeFile: routes/dev_straight.json
   cruiseSpeed: 13.9
+  initialSpeed: 0
   maxLateralAccel: 3
   comfortDecel: 2
   comfortAccel: 1.5
@@ -6464,7 +6465,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1596595282}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2ca2e0fa021e6164bbafe7c0d0774102, type: 3}
   m_Name: 
