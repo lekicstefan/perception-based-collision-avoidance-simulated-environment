@@ -138,7 +138,7 @@ public static class RoadsideSceneryBuilder
                     RouteSample smp = r.Sample(sc);
                     Vector3 left = new Vector3(-Mathf.Sin(smp.heading), 0f, Mathf.Cos(smp.heading));
                     Vector3 pos = smp.position + left * (c0 + sign * (verge + cfg.buildingSetbackM + depth * 0.5f));
-                    pos.y = 0f;
+                    pos.y = smp.position.y;
                     Quaternion rot = Quaternion.LookRotation(-left * sign, Vector3.up) * Quaternion.Euler(0f, cfg.buildingFrontYaw, 0f);
                     Place(pf, pos, rot, parent);
                     nB++;
@@ -163,7 +163,7 @@ public static class RoadsideSceneryBuilder
                     RouteSample smp = r.Sample(s);
                     Vector3 left = new Vector3(-Mathf.Sin(smp.heading), 0f, Mathf.Cos(smp.heading));
                     Vector3 pos = smp.position + left * (c0 + sign * (half + cfg.treeCurbOffsetM + (float)rng.NextDouble() * 0.4f));
-                    pos.y = CurbHeight;
+                    pos.y = smp.position.y + CurbHeight;
                     Place(trees[rng.Next(trees.Count)], pos, Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), parent);
                     nT++;
                 }
@@ -182,7 +182,7 @@ public static class RoadsideSceneryBuilder
                 RouteSample smp = r.Sample(s);
                 Vector3 left = new Vector3(-Mathf.Sin(smp.heading), 0f, Mathf.Cos(smp.heading));
                 Vector3 pos = smp.position + left * (c0 + sign * (half + cfg.lampOffsetM));
-                pos.y = CurbHeight;
+                pos.y = smp.position.y + CurbHeight;
                 Place(lamp, pos, Quaternion.LookRotation(-left * sign, Vector3.up) * Quaternion.Euler(0f, cfg.lampFrontYaw, 0f), parent);
                 nL++;
             }
@@ -202,7 +202,7 @@ public static class RoadsideSceneryBuilder
                 RouteSample smp = r.Sample(s);
                 Vector3 left = new Vector3(-Mathf.Sin(smp.heading), 0f, Mathf.Cos(smp.heading));
                 Vector3 pos = smp.position + left * (c0 + sign * (half + cfg.sidewalkWidth * 0.7f));
-                pos.y = CurbHeight;
+                pos.y = smp.position.y + CurbHeight;
                 Place(props[rng.Next(props.Count)], pos, Quaternion.LookRotation(-left * sign, Vector3.up) * Quaternion.Euler(0f, ((float)rng.NextDouble() - 0.5f) * 20f, 0f), parent);
                 nP++;
             }

@@ -25,7 +25,7 @@ The packs below are free on the Unity Asset Store. Their licence is the Unity As
 | City Town Lowpoly Pack (Pandazole Ultimate Pack) | Pandazole | buildings, trees, bushes, cones, signs, bins (`PD_*`) | `Pandazole_Ultimate_Pack` | 20.10.2026. |
 | Town Pack | SimplePoly | buildings, trees, street lamps, benches, hydrants (`SP_*`) | `SimplePoly - Town Pack` | 20.10.2026. |
 | Banana Man | Banana Yellow Games | pedestrian dummy (`Pedestrian_Adult`, `Pedestrian_Child`) | `Banana Yellow Games` | 20.10.2026. |
-| Animated Low Poly 3D Models (Animals_FREE) | ithappy | not used so far (its materials need conversion to the Built-in pipeline) | `ithappy` | 20.10.2026. |
+| Animated Low Poly 3D Models (Animals_FREE) | ithappy | the cat `Kitty_001` (scenario 8); the kit re-makes its materials for the Built-in pipeline and gives it a run animation | `ithappy` | 20.10.2026. |
 
 Licence terms: https://unity.com/legal/as-terms
 

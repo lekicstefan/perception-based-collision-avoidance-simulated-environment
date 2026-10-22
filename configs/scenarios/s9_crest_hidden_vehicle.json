@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "name": "s9_crest_hidden_vehicle",
+  "description": "Scenario 9: crest of a hill hiding a stopped car. The road climbs at 8 % to a crest 150 m from the start (peak 6.9 m) and falls again; a car stands still in the ego lane 25 m beyond the crest (route distance 175 m). The approach is at 50 km/h. From the sensor height the car is hidden by the crest until the ego car is about 40 to 50 m away.",
+  "scene": "S9_CrestHiddenVehicle",
+  "systemVariant": "default",
+  "driver": {
+    "route": "routes/scn_crest.json",
+    "cruiseSpeedMps": 13.9,
+    "initialSpeedMps": 13.9
+  },
+  "sensors": {
+    "config": "default",
+    "seed": 12345
+  },
+  "environment": {
+    "fogVisibilityM": 0
+  },
+  "end": {
+    "timeoutS": 60
+  }
+}

@@ -83,6 +83,32 @@ A timed start relative to the ego car: the object starts so that it reaches the 
 
 Limits: the prediction ignores steering (the route arc length is used as the distance driven), so it is a little off on tight bends; the conflict point must be before the point where the driver stops (route end minus `endMarginM`); the ego car starts at rest or, with `driver.initialSpeedMps`, at that speed (the speed profile then starts from it, so it keeps its speed instead of braking).
 
+## Scenarios
+
+Every scenario scene is a copy of another scenario scene (S1 for the straight road, S4 for a crossing, S5 for the narrow street) with its objects placed by hand. The ego car drives the scripted route at the given speed; the scripted driver does not react to anything, so a collision in a run without the system is the expected outcome. All scenarios use the sensor configuration `default`, seed 12345, a 60 s timeout, and start the ego car at its cruise speed (`driver.initialSpeedMps`). Pedestrian, cat and vehicle starts use the time-to-reach trigger with `arrivalOffsetS` 0 unless stated.
+
+| Scene | Scenario file | Route | Ego speed | What happens |
+|---|---|---|---|---|
+| `S1_StationaryObstacle` | `s1_stationary_obstacle` | `scn_straight_300` | 50 km/h | a parked car (`StationaryCar`) stands in the ego lane 200 m from the start |
+| | `s1_stationary_obstacle_fog100` | | 50 km/h | the same with 100 m fog visibility |
+| `S2_SlowLeadVehicle` | `s2_slow_lead_vehicle` | `scn_straight_300` | 50 km/h | `LeadCar` 30 m ahead drives 20 km/h and never brakes |
+| `S3_BrakingLeadVehicle` | `s3_braking_lead_vehicle` | `scn_straight_300` | 50 km/h | `LeadCar` 25 m ahead drives 50 km/h and brakes at 6 m/s^2 to a stop after 3 s |
+| `S4_CrossingPedestrian` | `s4_crossing_pedestrian` | `scn_straight_300` | 50 km/h | an adult walks 1.4 m/s from the right pavement across the lane, collision course; zebra crossing at 100 m |
+| | `s4_crossing_pedestrian_fog100` | | 50 km/h | the same with 100 m fog |
+| | `s4_sudden_change` | | 50 km/h | the pedestrian stops at the kerb edge (1.5 m along its path) for 1.5 s, then runs at 3.5 m/s (6 m/s^2) |
+| `S5_NarrowStreet` | `s5_narrow_street` | `scn_straight_300` | 30 km/h | cars parked along the right kerb, the ego car in the middle of the road; an adult steps out between two parked cars at 1.5 m/s |
+| `S6_NarrowStreetStanding` | `s6_narrow_street_standing` | `scn_straight_300` | 30 km/h | a person stands next to a parked car, touching it; nobody moves |
+| `S7_NegativeControl` | `s7_negative_control` | `scn_straight_300` | 30 km/h | no hazard: parked cars, a person on the pavement, an oncoming car at 50 km/h in the other lane |
+| `S8_CatCrossing` | `s8_cat_crossing` | `scn_straight_300` | 50 km/h | a cat (0.5 m long) runs 3 m/s from the right kerb across the lane, collision course |
+| `S9_CrestHiddenVehicle` | `s9_crest_hidden_vehicle` | `scn_crest` | 50 km/h | the road climbs 8 % to a crest at 150 m (peak 6.9 m); a stopped car stands in the lane at 175 m, hidden by the crest until about 40 to 50 m |
+| `S10_BlindBend` | `s10_blind_bend` | `scn_bend` | 40 km/h | straight 100 m, left bend (90 degrees, radius 30 m), a stopped car in the lane after the bend, hidden by the buildings on the inside |
+
+Relation to the specification: scenarios 1 to 4 are the same; specification 5 is `S5` plus its standing-person variant `S6`; specification 6 (fog) is the `_fog100` files, other densities come from `--set environment.fogVisibilityM=...`; specification 7 (sudden change, pedestrian version) is `s4_sudden_change`; specification 8 (negative controls) is `S7`. `S8` (cat) is an addition (an object much smaller than a person). `S9` and `S10` are the extended scenarios 9 (crest) and 10 (blind bend).
+
+Routes (`configs/routes`): `scn_straight_300` is 300 m straight. `scn_crest` is straight with the elevation profile above (the waypoints are 10 m apart, the route is splined). `scn_bend` has a bend of 30 m radius; the scripted driver slows for it by its lateral acceleration limit. The road is 9 m wide with a centre offset of 2.25 m (the ego car in the right lane) in S1 to S4 and S8 to S10, and with offset 0 (the ego car in the middle) in S5 to S7.
+
+Sweep points of a scenario are made with `--set` (see below): ego speed (`driver.cruiseSpeedMps` and `driver.initialSpeedMps`), the trigger offset, object speeds, event times, fog.
+
 ## Overrides and sweep points
 
     --set driver.cruiseSpeedMps=11.1
@@ -106,4 +132,4 @@ Views (`ViewControls`, debug only, never sent to the processor): `1`-`9` / `C` c
 
 - The processor assumes the braking capability measured in phase 2 (8 m/s^2, 0.15 s effective delay). `vehicle.maxBrakeMps2` and `vehicle.actuationDelayS` are in the file so that a run documents the car it used; changing them changes the car, not the processor's model.
 - The scenario does not set the processor's options (`--passing-speed-kmh`, `--pin`, pose noise sigmas). The batch runner passes those.
-- `dev` is the reference file for the development scene, `dev_trigger` tests the triggers and speed events there. The core scenarios 1 to 8 are added in step 8.5, one scene and one or more scenario files each (see `docs/scenery.md` for the scenery tools).
+- `dev` is the reference file for the development scene, `dev_trigger` tests the triggers and speed events there. The core scenarios are listed below (see `docs/scenery.md` for the scenery tools).

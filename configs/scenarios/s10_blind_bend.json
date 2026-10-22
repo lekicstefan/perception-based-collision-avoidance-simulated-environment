@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "name": "s10_blind_bend",
+  "description": "Scenario 10: blind bend with an obstacle after the curve. The route is straight for 100 m, turns left through 90 degrees (radius 30 m) and continues straight; a car stands still in the ego lane 25 m after the bend, hidden from the approach by the buildings on the inside of the bend. The scripted driver slows for the bend by its lateral acceleration limit but does not react to the car. Approach 40 km/h.",
+  "scene": "S10_BlindBend",
+  "systemVariant": "default",
+  "driver": {
+    "route": "routes/scn_bend.json",
+    "cruiseSpeedMps": 11.1,
+    "initialSpeedMps": 11.1
+  },
+  "sensors": {
+    "config": "default",
+    "seed": 12345
+  },
+  "environment": {
+    "fogVisibilityM": 0
+  },
+  "end": {
+    "timeoutS": 60
+  }
+}

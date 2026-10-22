@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "s8_cat_crossing",
+  "description": "Scenario 8: a cat runs across the road from the right-hand kerb at 3 m/s, on a collision course with the ego car (50 km/h). The cat starts so that it reaches the conflict point (the ego lane) at the same moment as the front of the car (trigger.arrivalOffsetS = 0). A cat is far smaller than a person (about 0.5 m long and 0.3 m high), so this tests the lower limit of what the lidar still resolves. The scripted driver does not react.",
+  "scene": "S8_CatCrossing",
+  "systemVariant": "default",
+  "driver": {
+    "route": "routes/scn_straight_300.json",
+    "cruiseSpeedMps": 13.9,
+    "initialSpeedMps": 13.9
+  },
+  "sensors": {
+    "config": "default",
+    "seed": 12345
+  },
+  "environment": {
+    "fogVisibilityM": 0
+  },
+  "objects": {
+    "Cat": {
+      "speedMps": 3.0,
+      "trigger": {
+        "arrivalOffsetS": 0.0
+      }
+    }
+  },
+  "end": {
+    "timeoutS": 60
+  }
+}

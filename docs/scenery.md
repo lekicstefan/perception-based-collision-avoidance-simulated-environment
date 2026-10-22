@@ -65,7 +65,8 @@ Texture coordinates of the ribbon are in metres (`Uv Tile M`, 4 m), so a texture
 `RouteRoadDressing` adds, on the same object:
 
 * sidewalks on both sides (`Sidewalk Width`, curb 12 cm): one mesh on the Ground layer. The ego car never collides with it, the lidar sees it;
-* a dashed centre line (3 m dash, 6 m gap) and edge lines, 2 cm above the road, with no collider (the lidar cannot see them, the camera can).
+* a dashed centre line (3 m dash, 6 m gap) and edge lines, 2 cm above the road, with no collider (the lidar cannot see them, the camera can);
+* zebra crossings: the list `Zebra Crossings` has one entry per crossing, x = distance along the route of its centre, y = its length along the route (3 m). The stripes run along the road across its whole width, 2.5 cm above the surface, with no collider. They are built when the scene starts, so a change shows after pressing Play. The dashed centre line can run through a crossing; this is accepted.
 
 Junctions and crossing roads are separate road objects, each with its own route file; switch off a sidewalk where two roads overlap.
 
@@ -93,6 +94,14 @@ Buildings are placed along the route, so on a sharp curve the buildings on the i
 * One root collider per prefab; visual parts have no colliders.
 * Every solid prefab is a `Hazard` on the Hazard layer; ground surfaces are on the Ground layer (3) and are not Hazards. The ego car only collides with the Hazard layer, the vehicle's ground ray uses only the Ground layer.
 * Lane markings have no collider and are invisible to the lidar.
+
+## Hills
+
+The route has an elevation per waypoint, and the road, the sidewalks, the markings and the generated scenery follow it (trees, lamps, props and buildings stand at the height of the route at their position). The flat ground does not: for a hill the scene also gets a ground ribbon, a second `RouteRoadMesh` object (`HillGround`) with a width of 400 m, the ground material and the Ground layer, moved 0.1 m down so that it lies under the road. It follows the route's elevation, so the ground rises and falls with the road. Unity prints a warning that the object is not at the origin; this is intended.
+
+## Animals
+
+The kit wraps the cat of the ithappy pack (`Animals_FREE`), found by file name. The pack's scripts, character controller and rigid body are removed, its materials (made for another render pipeline) are re-made as Standard materials with the same texture, and the model is scaled so that it is 0.5 m long. The Animator stays; the model does not walk, it slides like the pedestrians. If it faces the wrong way, fix the yaw of `Visual` in the prefab (see above).
 
 ## Limits and open items
 

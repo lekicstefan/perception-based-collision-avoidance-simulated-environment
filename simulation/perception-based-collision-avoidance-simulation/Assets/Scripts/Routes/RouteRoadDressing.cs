@@ -6,6 +6,7 @@ using UnityEngine;
 // Built once at Awake, like the road itself. Both meshes are scenery for the camera and the lidar, nothing here is ground truth:
 //   Sidewalks  one mesh with a MeshCollider on the Ground layer (the lidar sees the curb and the sidewalk, the ego car never collides with them)
 //   Markings   centre dashes and edge lines, 2 cm above the road, no collider (the lidar cannot see them, the camera can)
+//   Crossings  zebra crossings (list 'zebraCrossings'), like the markings: 2.5 cm above the road, no collider
 // The materials are optional: the ones that the Environment Kit makes (Tools > Environment Kit) can be assigned here, otherwise grey ones are made.
 [DefaultExecutionOrder(-5)]
 public class RouteRoadDressing : MonoBehaviour
@@ -34,6 +35,13 @@ public class RouteRoadDressing : MonoBehaviour
     public float edgeInsetM = 0.3f;              // distance of the edge lines from the road edge
     public Material centreLineMaterial;
     public Material edgeLineMaterial;
+
+    [Header("Zebra crossings")]
+    [Tooltip("One entry per crossing: x = distance along the route of its centre (m), y = its length along the route (m, 3 is normal). Put the conflict point of a crossing pedestrian in the middle.")]
+    public List<Vector2> zebraCrossings = new List<Vector2>();
+    public float zebraStripeWidthM = 0.5f;
+    public float zebraGapM = 0.5f;
+    public Material zebraMaterial;               // missing: the edge line material is used
 
     public float spacing = 1f;                   // section length along the route
     public float uvTileM = 2f;                   // texture tile size of the sidewalk, metres
@@ -121,6 +129,7 @@ public class RouteRoadDressing : MonoBehaviour
 
         BuildSidewalks(centre, left, ds, half);
         BuildMarkings(r, half);
+        BuildCrossings(r, half);
         status = "OK";
         UnityEngine.Debug.Log("ROAD DRESSING built from " + routeFile + ": road width " + roadWidth.ToString("F1") + " m, sidewalks " +
             (leftSidewalk ? "left " : "") + (rightSidewalk ? "right " : "") + sidewalkWidth.ToString("F1") + " m wide, curb " + curbHeight.ToString("F2") + " m");
@@ -236,6 +245,30 @@ public class RouteRoadDressing : MonoBehaviour
         mesh.RecalculateBounds();
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         go.AddComponent<MeshRenderer>().sharedMaterials = new[] { centreLineMaterial, edgeLineMaterial };
+    }
+
+    // zebra stripes parallel to the road, across its whole width (inside the edge lines), at every entry of zebraCrossings
+    void BuildCrossings(Route r, float half)
+    {
+        if (zebraCrossings == null || zebraCrossings.Count == 0) return;
+        var m = new MeshData();
+        float pitch = zebraStripeWidthM + zebraGapM;
+        float span = 2f * (half - edgeInsetM) - 0.2f;
+        int n = Mathf.Max(1, Mathf.FloorToInt((span + zebraGapM) / pitch));
+        float first = -0.5f * (n - 1) * pitch;
+        float step = Mathf.Max(0.25f, Mathf.Min(spacing, 1f));
+        foreach (Vector2 c in zebraCrossings)
+        {
+            float s0 = Mathf.Max(0f, c.x - 0.5f * c.y), s1 = Mathf.Min(r.Length, c.x + 0.5f * c.y);
+            for (int k = 0; k < n; k++)
+                AddStrip(m, r, s0, s1, centreOffsetM + first + k * pitch, 0.5f * zebraStripeWidthM, 0.025f, step);
+        }
+        if (zebraMaterial == null) zebraMaterial = edgeLineMaterial != null ? edgeLineMaterial : MakeMaterial(new Color(0.92f, 0.92f, 0.92f));
+        var go = new GameObject("Crossings");
+        go.transform.SetParent(transform, false);
+        go.layer = 0;
+        go.AddComponent<MeshFilter>().sharedMesh = m.ToMesh("Crossings");
+        go.AddComponent<MeshRenderer>().sharedMaterial = zebraMaterial;
     }
 
     // a strip of the given half width, centred 'offset' metres to the left of the route, from distance s0 to s1

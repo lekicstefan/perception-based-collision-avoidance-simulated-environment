@@ -50,12 +50,18 @@ public static class EnvironmentKit
         public float patch;                     // diameter of a flat green disc around the foot (trees), 0 = none
         public bool aPose, yellow;              // people: arms down in an A pose, crash-test yellow body
         public bool dolly;                      // a small wheeled base and a pole under the model (the people), so that it looks like it rolls
+        public float fitLength;                 // > 0: the scale is chosen so that the longest side (x or z) of the model is this long, in metres
+        public bool animal;                     // pack models: scripts and physics components removed, the pack's materials re-made as Standard materials
     }
 
     static readonly List<Item> Catalog = new List<Item>();
 
     static void Box(string name, string source, string label, float scale = 1f, float yaw = 0f)
     { Catalog.Add(new Item { name = name, source = source, label = label, scale = scale, yaw = yaw }); }
+
+    // an animal of the ithappy pack: 'find' is "find:<folder in Asset Packs>:<part of the file name>", the file is looked up by name
+    static void Animal(string name, string find, string label, float lengthM)
+    { Catalog.Add(new Item { name = name, source = find, label = label, fitLength = lengthM, animal = true }); }
 
     static void Cap(string name, string source, string label, float radius, float heightFrac = 1f, float scale = 1f, float yaw = 0f, bool dolly = false, float patch = 0f, bool person = false)
     { Catalog.Add(new Item { name = name, source = source, label = label, capsule = true, radius = radius, heightFrac = heightFrac, scale = scale, yaw = yaw, dolly = dolly, patch = patch, aPose = person, yellow = person }); }
@@ -67,6 +73,9 @@ public static class EnvironmentKit
         // people: the dummy is 1.9 m tall as imported
         Cap("Pedestrian_Adult", Banana, "pedestrian_adult", 0.30f, 1f, 0.92f, 0f, true, 0f, true);
         Cap("Pedestrian_Child", Banana, "pedestrian_child", 0.20f, 1f, 0.58f, 0f, true, 0f, true);
+
+        // animals (ithappy Animals_FREE): the cat is scaled to 0.5 m long
+        Animal("Animal_Cat", "find:ithappy:kitty", "cat", 0.5f);
 
         // vehicles (Kenney Car Kit, CC0, the same family as the ego car)
         foreach (string v in new[] { "sedan:car", "sedan-sports:car", "suv:car", "suv-luxury:car", "hatchback-sports:car", "taxi:car", "police:car",
@@ -183,16 +192,24 @@ public static class EnvironmentKit
             EditorUtility.DisplayDialog("Environment Kit", "Select the GameObject that has the RouteRoadMesh component (the road) in the Hierarchy first.", "OK");
             return;
         }
+        DressRoad(sel);
+        UnityEngine.Debug.Log("ENVIRONMENT KIT: road dressing added to '" + sel.name + "' (sidewalks and markings appear when the scene plays)");
+    }
+
+    // Adds (or updates) RouteRoadDressing on a road object and gives the road and the dressing the kit materials. Also used by the scenario scene builder.
+    public static RouteRoadDressing DressRoad(GameObject roadObject)
+    {
+        RouteRoadMesh road = roadObject.GetComponent<RouteRoadMesh>();
         EnsureKit();
-        var dressing = sel.GetComponent<RouteRoadDressing>();
-        if (dressing == null) dressing = Undo.AddComponent<RouteRoadDressing>(sel);
+        var dressing = roadObject.GetComponent<RouteRoadDressing>();
+        if (dressing == null) dressing = Undo.AddComponent<RouteRoadDressing>(roadObject);
         else Undo.RecordObject(dressing, "Road dressing");
         dressing.roadMesh = road;
         dressing.sidewalkMaterial = LoadMat("Sidewalk");
         dressing.curbMaterial = LoadMat("Curb");
         dressing.centreLineMaterial = LoadMat("Line_White");
         dressing.edgeLineMaterial = LoadMat("Line_White");
-        var mr = sel.GetComponent<MeshRenderer>();
+        var mr = roadObject.GetComponent<MeshRenderer>();
         if (mr != null)
         {
             Undo.RecordObject(mr, "Road material");
@@ -200,7 +217,7 @@ public static class EnvironmentKit
         }
         EditorUtility.SetDirty(dressing);
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-        UnityEngine.Debug.Log("ENVIRONMENT KIT: road dressing added to '" + sel.name + "' (sidewalks and markings appear when the scene plays)");
+        return dressing;
     }
 
     [MenuItem("Tools/Environment Kit/Create showcase scene")]
@@ -384,18 +401,20 @@ public static class EnvironmentKit
 
     static bool Wrap(Item it)
     {
-        var src = AssetDatabase.LoadAssetAtPath<GameObject>(it.source);
+        string sourcePath = ResolveSource(it.source);
+        var src = sourcePath == null ? null : AssetDatabase.LoadAssetAtPath<GameObject>(sourcePath);
         if (src == null)
         {
             UnityEngine.Debug.LogWarning("ENVIRONMENT KIT: source not found for " + it.name + ": " + it.source);
             return false;
         }
         float yaw = it.yaw, scale = it.scale;
+        bool kept = false;
         if (!resetOrientation)
         {
             var old = AssetDatabase.LoadAssetAtPath<GameObject>(PreDir + "/" + it.name + ".prefab");
             Transform ov = old != null ? old.transform.Find("Visual") : null;
-            if (ov != null) { yaw = ov.localEulerAngles.y; scale = ov.localScale.x; }
+            if (ov != null) { yaw = ov.localEulerAngles.y; scale = ov.localScale.x; kept = true; }
         }
         var root = new GameObject(it.name);
         var visual = UnityEngine.Object.Instantiate(src);        // a plain copy, not a prefab instance: its colliders can be removed
@@ -405,6 +424,14 @@ public static class EnvironmentKit
         visual.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
         visual.transform.localScale = Vector3.one * scale;
         foreach (Collider c in visual.GetComponentsInChildren<Collider>()) UnityEngine.Object.DestroyImmediate(c);
+        if (it.animal) PrepareAnimal(visual, it.name, AnimalFolder(it.source));
+        if (it.fitLength > 0f && !kept)
+        {
+            visual.transform.localScale = Vector3.one;
+            Bounds fb = WorldBounds(root);
+            float longest = Mathf.Max(fb.size.x, fb.size.z);
+            if (longest > 0.001f) { scale = it.fitLength / longest; visual.transform.localScale = Vector3.one * scale; }
+        }
         if (it.aPose) MakeAPose(visual, 40f);
         if (it.yellow) TintBody(visual);
 
@@ -541,6 +568,129 @@ public static class EnvironmentKit
     {
         g.layer = layer;
         foreach (Transform t in g.transform) SetLayer(t.gameObject, layer);
+    }
+
+    // "find:<folder>:<name>" -> the shortest prefab (else model) file name that contains <name> below Assets/Asset Packs/<folder>; other strings are paths
+    static string ResolveSource(string source)
+    {
+        if (!source.StartsWith("find:", StringComparison.Ordinal)) return source;
+        string[] p = source.Split(':');
+        string best = null;
+        foreach (string type in new[] { "t:Prefab", "t:Model" })
+        {
+            foreach (string guid in AssetDatabase.FindAssets(p[2] + " " + type, new[] { Packs + p[1] }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                string n = Path.GetFileNameWithoutExtension(path);
+                if (n.IndexOf(p[2], StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (best == null) { best = path; continue; }
+                string bn = Path.GetFileNameWithoutExtension(best);
+                if (n.Length < bn.Length || (n.Length == bn.Length && string.CompareOrdinal(n, bn) < 0)) best = path;
+            }
+            if (best != null) break;
+        }
+        UnityEngine.Debug.Log("ENVIRONMENT KIT: '" + source + "' resolved to " + (best ?? "NOTHING"));
+        return best;
+    }
+
+    // animals: the pack's scripts, character controller and rigid body are removed (the Animator stays, so the model keeps its animation controller);
+    // the pack's materials are for another render pipeline, so each one is re-made as a Standard material with the same texture and colour
+    static void PrepareAnimal(GameObject visual, string name, string folder)
+    {
+        foreach (MonoBehaviour mb in visual.GetComponentsInChildren<MonoBehaviour>(true)) UnityEngine.Object.DestroyImmediate(mb);
+        foreach (CharacterController cc in visual.GetComponentsInChildren<CharacterController>(true)) UnityEngine.Object.DestroyImmediate(cc);
+        foreach (Rigidbody rb in visual.GetComponentsInChildren<Rigidbody>(true)) UnityEngine.Object.DestroyImmediate(rb);
+        EnsureDir(MatDir);
+        SetupAnimation(visual, name, folder);
+        int k = 0;
+        foreach (Renderer r in visual.GetComponentsInChildren<Renderer>(true))
+        {
+            Material[] mats = r.sharedMaterials;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                if (mats[i] == null) continue;
+                Texture tex = null;
+                Color col = Color.white;
+                var so = new SerializedObject(mats[i]);
+                SerializedProperty texes = so.FindProperty("m_SavedProperties.m_TexEnvs");
+                for (int t = 0; t < texes.arraySize; t++)
+                {
+                    string pn = texes.GetArrayElementAtIndex(t).FindPropertyRelative("first").stringValue;
+                    var tp = texes.GetArrayElementAtIndex(t).FindPropertyRelative("second.m_Texture");
+                    if ((pn == "_BaseMap" || pn == "_MainTex") && tp.objectReferenceValue != null) { tex = (Texture)tp.objectReferenceValue; break; }
+                }
+                SerializedProperty cols = so.FindProperty("m_SavedProperties.m_Colors");
+                for (int c = 0; c < cols.arraySize; c++)
+                {
+                    string pn = cols.GetArrayElementAtIndex(c).FindPropertyRelative("first").stringValue;
+                    if (pn == "_BaseColor" || pn == "_Color") { col = cols.GetArrayElementAtIndex(c).FindPropertyRelative("second").colorValue; break; }
+                }
+                string path = MatDir + "/" + name + "_" + (k++) + ".mat";
+                var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (m == null) { m = new Material(Shader.Find("Standard")); AssetDatabase.CreateAsset(m, path); }
+                m.mainTexture = tex;
+                m.color = col;
+                if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", 0.05f);
+                if (tex == null) tex = FindPackTexture(folder, mats[i].name, name);
+                if (tex == null) UnityEngine.Debug.LogWarning("ENVIRONMENT KIT: no texture found for material '" + mats[i].name + "' of " + name + ", it is plain colour");
+                EditorUtility.SetDirty(m);
+                mats[i] = m;
+            }
+            r.sharedMaterials = mats;
+        }
+    }
+
+    static string AnimalFolder(string source)
+    {
+        string[] p = source.Split(':');
+        return Packs + p[1];
+    }
+
+    // the texture of a pack material that has none assigned: a texture file below the pack folder whose name contains the material's or the model's
+    // name (first the material), else the only texture there is
+    static Texture FindPackTexture(string folder, string materialName, string modelName)
+    {
+        var all = new List<string>();
+        foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { folder })) all.Add(AssetDatabase.GUIDToAssetPath(guid));
+        string pick = null;
+        foreach (string key in new[] { materialName, "kitty", "animal", "cat" })
+        {
+            foreach (string path in all)
+                if (Path.GetFileNameWithoutExtension(path).IndexOf(key, StringComparison.OrdinalIgnoreCase) >= 0) { pick = path; break; }
+            if (pick != null) break;
+        }
+        if (pick == null && all.Count == 1) pick = all[0];
+        UnityEngine.Debug.Log("ENVIRONMENT KIT: texture for '" + materialName + "': " + (pick ?? "none found among " + all.Count + " textures in " + folder));
+        return pick == null ? null : AssetDatabase.LoadAssetAtPath<Texture>(pick);
+    }
+
+    // an Animator controller with one looping state playing a run clip (else a walk clip) found below the pack folder; the model plays it in place
+    static void SetupAnimation(GameObject visual, string name, string folder)
+    {
+        var anim = visual.GetComponentInChildren<Animator>();
+        if (anim == null) { UnityEngine.Debug.LogWarning("ENVIRONMENT KIT: " + name + " has no Animator, no animation"); return; }
+        AnimationClip best = null;
+        foreach (string key in new[] { "run", "walk", "" })
+        {
+            foreach (string guid in AssetDatabase.FindAssets("t:AnimationClip", new[] { folder }))
+                foreach (UnityEngine.Object o in AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GUIDToAssetPath(guid)))
+                {
+                    var c = o as AnimationClip;
+                    if (c == null || c.name.StartsWith("__preview__", StringComparison.Ordinal)) continue;
+                    if (key.Length > 0 && c.name.IndexOf(key, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    best = c; break;
+                }
+            if (best != null) break;
+        }
+        if (best == null) { UnityEngine.Debug.LogWarning("ENVIRONMENT KIT: no animation clip found below " + folder); return; }
+        string path = MatDir.Replace("/Materials", "") + "/" + name + "_Anim.controller";
+        var ctrl = UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath(path);
+        var st = ctrl.layers[0].stateMachine.AddState("Move");
+        st.motion = best;
+        ctrl.layers[0].stateMachine.defaultState = st;
+        anim.runtimeAnimatorController = ctrl;
+        anim.applyRootMotion = false;
+        UnityEngine.Debug.Log("ENVIRONMENT KIT: " + name + " plays the clip '" + best.name + "'");
     }
 
     static void Save(GameObject root)
