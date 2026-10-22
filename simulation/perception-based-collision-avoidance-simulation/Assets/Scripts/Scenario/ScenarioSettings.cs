@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 //
 // Value precedence, strongest first:
 //   --set path=value on the command line  >  Editor Overrides below  >  the scenario file  >  the value set on the component in the scene.
-// --scenario NAME on the command line replaces the Scenario field. --sensors and --seed (SensorRig) still win over the scenario's sensors.
+// --scenario NAME on the command line replaces the Scenario field; a scenario picked in the menu (ScenarioContext.Pick) replaces both. --sensors and --seed (SensorRig) still win over the scenario's sensors.
 //
 // Every run stores the resolved scenario (config/scenario_resolved.json, written by RunLogger): the value of every setting that was actually
 // used, including those the file did not mention. A bad scenario (missing file, misspelled key, impossible value, wrong scene) stops the run
@@ -33,7 +33,7 @@ public class ScenarioSettings : MonoBehaviour
 
     void Awake()
     {
-        string name = Cli.Get("--scenario", scenario);
+        string name = !string.IsNullOrEmpty(ScenarioContext.Pick) ? ScenarioContext.Pick : Cli.Get("--scenario", scenario);   // the menu pick wins, then --scenario, then the field
         if (string.IsNullOrEmpty(name))
         {
             UnityEngine.Debug.LogWarning("SCENARIO: none selected, the scene runs exactly as built and no scenario is recorded");

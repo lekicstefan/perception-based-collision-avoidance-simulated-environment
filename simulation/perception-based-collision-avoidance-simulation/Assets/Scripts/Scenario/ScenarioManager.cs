@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using static System.Net.Mime.MediaTypeNames;
 
 // Owns the life of one run in a scenario scene: start, the end conditions, the outcome, restart, pause and the time scale. One per scene.
 //
@@ -20,7 +21,7 @@ using UnityEngine.SceneManagement;
 // marked as not valid for experiments in run.json (end.outcome.validForExperiments). Every new run starts at 1x.
 //
 // Keys (click the Game view first; ignored while a text field has the keyboard):
-//   R restart   P pause / resume   X end the run   + faster   - slower   0 back to 1x
+//   R restart   P pause / resume   X end the run   M back to the menu   + faster   - slower   0 back to 1x
 //
 // The scene must be listed in the Build Settings for a restart to work (File > Build Profiles > Scene List).
 [DefaultExecutionOrder(-400)]   // before ScenarioSettings (-300) and everything else: resets the per-run statics first
@@ -47,6 +48,7 @@ public class ScenarioManager : MonoBehaviour
 
     EndParams end = new EndParams();
     bool hasMoved, restartRequested;
+    string pendingScene;                  // a scene to load when the run has ended (the menu)
     float stoppedFor;
     string endText = "";
     int scaleIndex = 2;
@@ -167,6 +169,11 @@ public class ScenarioManager : MonoBehaviour
         Time.timeScale = 0f;
         State = RunState.Ended;
 
+        if (pendingScene != null)
+        {
+            LoadPending();
+            yield break;
+        }
         if (restartRequested)
         {
             Reload();
@@ -184,6 +191,28 @@ public class ScenarioManager : MonoBehaviour
         restartRequested = true;
         if (State == RunState.Ended) Reload();
         else if (State != RunState.Ending) Finish(RunControl.EndReason.Manual);   // Ending: the finish routine reloads when it is done
+    }
+
+    // Ends the run if one is going and goes to the scenario menu scene (ScenarioContext.MenuScene, in the Build Settings).
+    public void ToMenu()
+    {
+        if (pendingScene != null || restartRequested) return;
+        if (!UnityEngine.Application.CanStreamedLevelBeLoaded(ScenarioContext.MenuScene))
+        {
+            UnityEngine.Debug.LogWarning("SCENARIO MANAGER: there is no scene '" + ScenarioContext.MenuScene + "' in the Build Settings, so there is no menu to go to");
+            return;
+        }
+        pendingScene = ScenarioContext.MenuScene;
+        if (State == RunState.Ended) LoadPending();
+        else if (State != RunState.Ending) Finish(RunControl.EndReason.Manual);   // Ending: the finish routine loads it when it is done
+    }
+
+    void LoadPending()
+    {
+        string scene = pendingScene;
+        pendingScene = null;
+        UnityEngine.Debug.Log("MENU | loading scene '" + scene + "'");
+        SceneManager.LoadScene(scene);
     }
 
     // Ends the run now (reason Manual) and leaves the scene frozen. Restart starts the next one.
@@ -260,6 +289,7 @@ public class ScenarioManager : MonoBehaviour
         if (e.keyCode == KeyCode.R) { Restart(); e.Use(); }
         else if (e.keyCode == KeyCode.P) { TogglePause(); e.Use(); }
         else if (e.keyCode == KeyCode.X) { EndRun(); e.Use(); }
+        else if (e.keyCode == KeyCode.M) { ToMenu(); e.Use(); }
         else if (e.keyCode == KeyCode.Alpha0 || e.keyCode == KeyCode.Keypad0) { ResetSpeed(); e.Use(); }
         else if (e.keyCode == KeyCode.None)
         {
@@ -284,7 +314,7 @@ public class ScenarioManager : MonoBehaviour
             warnStyle.fontStyle = FontStyle.Bold;
         }
 
-        GUILayout.BeginArea(new Rect(10f, Screen.height - 132f, 640f, 96f), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(10f, Screen.height - 132f, 740f, 96f), GUI.skin.box);
         string scenario = ScenarioContext.Loaded ? ScenarioContext.Config.name : "(no scenario)";
         string status;
         switch (State)
@@ -301,6 +331,7 @@ public class ScenarioManager : MonoBehaviour
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("Restart (R)", GUILayout.Width(100f))) Restart();
+        if (GUILayout.Button("Menu (M)", GUILayout.Width(90f))) ToMenu();
         GUI.enabled = State == RunState.Running;
         if (GUILayout.Button(Paused ? "Resume (P)" : "Pause (P)", GUILayout.Width(100f))) TogglePause();
         if (GUILayout.Button("End run (X)", GUILayout.Width(100f))) EndRun();

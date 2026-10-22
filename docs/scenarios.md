@@ -124,7 +124,13 @@ Every scenario scene has a `ScenarioManager`. A run starts when the processor an
 
 Run the processor with `--loop` so that it waits for the next run: `python -m server.run_processor --pin 2,4 --run-dir name --loop`. Each run gets its own folder (`name`, `name_2`, ...). Unity reloads the scene on restart (the scene must be in the Build Settings). `--quit-on-end` (Unity command line) quits the player when the run has ended, for batch runs.
 
-Keys (click the Game view first): `R` restart, `P` pause / resume, `X` end the run, `+` / `-` speed 0.25x to 4x, `0` back to 1x. A run at any speed other than 1x is **not valid for experiments** (both programs run on real wall-clock time) and `run.json` says so; every run starts at 1x. Pauses are recorded (`pauses`, `pausedRealS`) and do not invalidate a run.
+Keys (click the Game view first): `R` restart, `P` pause / resume, `X` end the run, `M` back to the menu, `+` / `-` speed 0.25x to 4x, `0` back to 1x. A run at any speed other than 1x is **not valid for experiments** (both programs run on real wall-clock time) and `run.json` says so; every run starts at 1x. Pauses are recorded (`pauses`, `pausedRealS`) and do not invalidate a run.
+
+### Menu
+
+The scene `Menu` (`Assets/Scenes/Menu.unity`, first in the Build Settings) has one object with `ScenarioMenu` (`Assets/Scripts/Scenario/`). It lists every file in `configs/scenarios` with its scene and description. **Start** loads the scene of that scenario and makes it the scenario that the scene runs: the choice (`ScenarioContext.Pick`) wins over `--scenario` and over the `Scenario` field of the scene, until the play session ends, so a restart (`R`) repeats the same scenario. `M` or the **Menu** button in a scenario scene ends the run and comes back to the list. A scenario whose scene is not in the Build Settings is greyed out with the reason; a file with an error shows the error. Scenes can still be opened and played directly, as before.
+
+The menu does not start the processor. Start it first with `--loop`; a scenario scene waits for it, and every scene load makes a new handshake and a new run folder.
 
 Views (`ViewControls`, debug only, never sent to the processor): `1`-`9` / `C` camera, `D` lidar dots, `B` lidar beams (`,` `.` move the ring), `L` lidar view (range image / bird's-eye), `V` camera view, `G` hazard boxes, `T` route, `H` hide the HUD. The choices are kept across restarts.
 

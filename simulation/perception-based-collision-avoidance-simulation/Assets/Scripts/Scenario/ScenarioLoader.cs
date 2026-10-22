@@ -13,8 +13,11 @@ public static class ScenarioContext
     public static string[] Overrides { get; private set; }
     public static string ResolvedJson { get; private set; }       // every value that was actually used; set once the scene has started
 
+    public const string MenuScene = "Menu";                        // the scene with the scenario menu (ScenarioMenu)
+    public static string Pick;                                     // the scenario chosen in the menu: wins over --scenario and the Scenario field, until the play session ends
+
     [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetForNewPlaySession() { Loaded = false; Config = null; SourcePath = null; Overrides = null; ResolvedJson = null; }
+    static void ResetForNewPlaySession() { Loaded = false; Config = null; SourcePath = null; Overrides = null; ResolvedJson = null; Pick = null; }
 
     public static void SetLoaded(ScenarioConfig config, string sourcePath, string[] overrides)
     {
