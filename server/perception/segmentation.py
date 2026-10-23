@@ -1,26 +1,3 @@
-"""Angle-based segmentation (step 5.4).
-
-Groups the candidate cells (valid returns that are not ground, see ground.py) of a range image into clusters, one per
-object, without any model of what the object is.
-
-  1. beta criterion. For two neighbouring cells with ranges d1 (the farther) and d2, separated by the beam angle alpha,
-         beta = atan2(d2 sin(alpha), d1 - d2 cos(alpha))
-     If beta exceeds a threshold (default 10 degrees) the cells belong to the same object. beta is the angle at the
-     farther point between the line of sight and the line to the nearer point, so a surface seen face on has a large
-     beta and a depth jump has a small one, at any range, which a fixed distance threshold cannot do.
-  2. Connected components over the 4-neighbourhood of the range image (the edges are computed vectorized, the components
-     by scipy). Cells that are not candidates (no return, max range, ground) have no edges: they are boundaries.
-  3. Secondary split test. beta can merge touching objects at similar range (a person next to a parked car). Each cluster's
-     depth profile (nearest range per column) and height profile (top of the cluster per column) are checked for a step
-     between neighbouring columns, and the cluster is cut there. A step must be larger than an absolute minimum and than
-     2.5 times the jumps next to it (so a slanted wall or the corner of a car, whose depth changes steadily, is not cut)
-     and, for the height profile, larger than 1.5 times the largest gap between the beams of the cluster at that range (the top is only sampled once per beam).
-  4. Range-dependent minimum size. The minimum is a physical width and height, converted into cells at the cluster's
-     (median) range: a 0.5 m wide object at 60 m is only 2 to 3 columns wide. Clusters spanning fewer columns or rows
-     than that, or fewer than min_cells cells, are discarded.
-
-Row/column conventions are those of range_image.py. Heights are z of the vehicle frame.
-"""
 from __future__ import annotations
 
 import math

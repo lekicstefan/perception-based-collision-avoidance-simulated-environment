@@ -1,9 +1,3 @@
-"""Run folder logging on the Python side (docs/run_folder.md): runs/<run id>/python/.
-
-The run folder is created by Unity and announced in the HELLO message (run_dir). Without Unity (replay, offline
-tests) offline_dir() makes a folder of its own. CSV is used for the tables because it is written row by row and
-survives a crash; it is converted to Parquet when the data is analysed (phase 16).
-"""
 from __future__ import annotations
 
 import csv

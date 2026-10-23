@@ -1,21 +1,3 @@
-"""Range image ingestion (steps 5.1 and 5.2).
-
-Turns a LIDAR message (uint16 centimetres) into a RangeImage the rest of the perception pipeline works on:
-
-  * metres, as float32. Only cells that really hold a return have a number; every other cell is NaN, so a missing
-    return can never be mistaken for a short or a long distance in later arithmetic.
-  * a per-cell class (CellState), the validity semantics of the specification:
-        VALID      a return: the ray hit something
-        NO_RETURN  code 0: dropout, fog or grazing angle. This is NOT free space, it is unknown
-        MAX_RANGE  code 65535: the ray reached maximum range or the sky. Free space up to the maximum range
-    Treating NO_RETURN as free space is the unsafe interpretation, so the classes stay distinct until the
-    occlusion logic (step 7.10) decides what each means.
-  * the geometry tables of the calibrated sensor (LidarGeometry): ray directions in the vehicle frame, and the angle
-    between neighbouring rays, which the segmentation (step 5.4) needs.
-
-Row and column mapping (from the calibration): row 0 = highest beam, column 0 = leftmost (azimuth positive to the
-left). Vehicle frame: origin at the centre of the rear axle at ground level, x forward, y left, z up.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass

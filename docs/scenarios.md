@@ -138,4 +138,4 @@ Views (`ViewControls`, debug only, never sent to the processor): `1`-`9` or `W` 
 
 - The processor assumes the braking capability measured in phase 2 (8 m/s^2, 0.15 s effective delay). `vehicle.maxBrakeMps2` and `vehicle.actuationDelayS` are in the file so that a run documents the car it used; changing them changes the car, not the processor's model.
 - The scenario does not set the processor's options (`--passing-speed-kmh`, `--pin`, pose noise sigmas). The batch runner passes those.
-- `dev` is the reference file for the development scene, `dev_trigger` tests the triggers and speed events there. The core scenarios are listed below (see `docs/scenery.md` for the scenery tools).
+- `dev` is the reference file for the development scene. The core scenarios are listed below (see `docs/scenery.md` for the scenery tools).

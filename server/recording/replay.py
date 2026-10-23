@@ -1,10 +1,3 @@
-"""Replay of a recorded sensor stream (step 4.8), and the offline processing mode.
-
-ReplayLink stands in for Link: the CycleRunner and the processor cannot tell the difference.
-  speed 1.0   original timing (messages are delivered when they originally arrived); 2.0 = twice as fast
-  speed 0     as fast as possible: no waiting, every cycle receives one cycle period of recorded time. This is
-              deterministic, so the same recording always gives the same sequence of batches (tests, debugging).
-"""
 from __future__ import annotations
 
 import time

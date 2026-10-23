@@ -1,28 +1,3 @@
-"""Frames of reference and conversions (step 6.1). The one place where the coordinate convention lives.
-
-The processor uses ONE convention everywhere (right-handed):
-
-    x forward, y left, z up;   yaw positive to the left (counter-clockwise seen from above), pitch positive nose up,
-    roll by the right-hand rule about the forward axis (positive: the right side goes down).
-
-Three frames:
-
-    sensor frame   -> vehicle frame   fixed calibration (server/geometry/calibration.py)
-    vehicle frame  -> world frame     pose of the car at the capture time of the measurement
-    world frame    = start frame      the vehicle frame at the beginning of the run (origin and heading of the car at t = 0)
-
-The pose that arrives in every message header is already a start-frame pose in this convention: the simulator converts
-at its boundary, in `PoseEstimator.ToStartFrame` and `YawToStart` (Unity script). Unity is left-handed, Y up, x right,
-z forward; its yaw about Y is clockwise seen from above. `unity_to_processor` and `to_start_frame` below are an independent
-Python statement of the same conversion; the test vectors of testing/tests/server/geometry/test_frames.py check them
-against a line-by-line port of the C# formulas. They are not called during a run.
-
-Tracking is 2D on the ground plane. Heights are used for detection and size, not for risk, so the world transform here is
-a rotation by the yaw and a shift by (x, y); pitch and roll of the car are ignored (they change a ground position by a
-fraction of a percent at the angles of a car on a road).
-
-All functions accept a single point (2,) or an array (..., 2); angles are radians.
-"""
 from __future__ import annotations
 
 import math

@@ -1,4 +1,3 @@
-"""The perception pipeline of one LiDAR scan: ground removal, segmentation, cluster geometry, optional camera refinement."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

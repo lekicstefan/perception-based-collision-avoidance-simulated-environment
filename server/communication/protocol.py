@@ -1,10 +1,3 @@
-"""Wire format of docs/protocol.md (schema version 1). All values are little-endian.
-
-Unity to Python: an 88-byte header (HEADER) followed by a payload.
-Python to Unity: a 12-byte header (COMMAND_HEADER) followed by a payload.
-The parse_* functions validate everything and raise ProtocolError, so a malformed message can never
-reach the perception code. The build_* functions exist for tests, the replay tool and a fake Unity.
-"""
 from __future__ import annotations
 
 import json

@@ -1,9 +1,3 @@
-"""Processor side of the ZeroMQ transport: docs/protocol.md sections 1 and 6.
-
-Link owns the sockets (one SUB per Unity stream, one PUB for commands), performs the handshake, and hands the
-processing cycle everything that arrived as Incoming(header, raw) objects. Session messages (HELLO, CALIBRATION,
-END_OF_RUN) are consumed here. Per-stream sequence numbers are checked so lost messages are counted, not hidden.
-"""
 from __future__ import annotations
 
 import time

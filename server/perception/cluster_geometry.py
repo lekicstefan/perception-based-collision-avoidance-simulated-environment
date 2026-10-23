@@ -1,26 +1,3 @@
-"""Cluster geometry (step 5.5): what the tracker and the risk logic measure of a cluster.
-
-For every cluster of the segmentation: its 3D points, the nearest point, a ground-plane bounding box, the visible
-extent seen from the sensor, the height, and a corrected box centre.
-
-Why a corrected centre. A LiDAR sees only the near surface of an object. The centroid of the visible points therefore
-moves when the viewing angle changes (more of a car's side comes into view as it passes, the centroid slides along it),
-which the tracker would read as velocity. Two quantities do not slide that way and are the preferred measurement points:
-
-  * the nearest point (also the conservative quantity for collision risk), and
-  * the corrected box centre: the centre of the visible extent, pushed back along the line of sight by a size prior.
-        u = unit vector from the sensor to the cluster (horizontal), v = u turned 90 degrees to the left
-        lateral centre = middle of the visible extent along v
-        depth of the object along u = max(visible depth, size_prior_m)
-        centre = sensor + u * (nearest depth + depth / 2) + v * lateral centre
-    The prior stands in for the part of the object that cannot be seen. It is one number for every object (no object is
-    treated differently by appearance or size) and it is a bias that is constant while the object is seen the same way,
-    which is what the tracker needs. It is tuned against the ground truth in the evaluation (step 5.7).
-
-All positions are in the vehicle frame of the scan time (x forward, y left, origin at the rear axle on the ground).
-world_xy() turns a point into the start-frame (world) coordinates with the pose of the scan. Heights are above the nominal
-ground plane (tilted by the car's pitch, as in ground.py).
-"""
 from __future__ import annotations
 
 import math

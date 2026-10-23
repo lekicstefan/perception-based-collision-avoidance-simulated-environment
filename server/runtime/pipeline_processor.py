@@ -1,15 +1,3 @@
-"""The real processor (step 7.13): perception -> tracking -> risk stage, one command per LiDAR scan.
-
-`PipelineProcessor` replaces the do-nothing `Processor` of cycle.py (same two methods). `step(msgs, calibration)` gets the messages of one cycle,
-sorted by capture time, and handles them in that order:
-  CAMERA  into the camera buffer (for the refinement of the scans) and as a bearing measurement to the tracker;
-  LIDAR   perception, world clusters, tracker step, risk stage; the command of the last scan of the cycle is returned (None without a scan);
-  TELEMETRY  after the scan, through `telemetry_sink`, at most every `telemetry_period_s` of data time (7.14);
-  POSE    ignored (the header of every message carries the ego state; the scan header is used).
-Everything is built at the first step from the calibration (and again if the calibration changes). `warmup()` has no calibration yet, so the
-compiled parts are warmed up by the first scans; nothing is sent before a scan arrives.
-Wall time before the stage (perception, tracking) and the age of the scan when the cycle started go into the delay accounting of the stage.
-"""
 from __future__ import annotations
 
 import time

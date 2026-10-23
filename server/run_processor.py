@@ -1,23 +1,3 @@
-"""Runs the processor: handshake with Unity, then the processing cycle until END_OF_RUN. Or replays a recording.
-
-  python -m server.run_processor                        # live, no run folder, nothing is written to disk
-  python -m server.run_processor --run-dir              # live, run folder runs/<date_time>
-  python -m server.run_processor --run-dir mytest       # live, run folder runs/mytest
-  python -m server.run_processor --run-dir --no-record  # logs, but no python/stream.bin
-  python -m server.run_processor --replay runs/<id> --speed 0                 # replay, no run folder
-  python -m server.run_processor --replay runs/<id> --speed 0 --run-dir       # replay, runs/<date_time>_replay
-  python -m server.run_processor --replay runs/<id> --run-dir mytest          # replay, runs/mytest
-  python -m server.run_processor --pose-sigma-m 0.05 --pose-sigma-yaw-deg 0.5  # tell the tracker and the risk stage the pose noise of the simulation
-  python -m server.run_processor --no-double-count                             # reachable radius without the present position sigma (7.9, off by default)
-  python -m server.run_processor --pin 2,4                                     # pin this process to logical CPUs 2 and 4 and give it high priority (section 4.2)
-  python -m server.run_processor --passing-speed-kmh 40                        # speed at which hazards that are only a precaution are passed (default 40, 0 = the occluded approach speed of the risk level)
-  python -m server.run_processor --max-scans-per-cycle 0                       # no load shedding (default 2: at most the two newest scans per cycle, see shedding.py)
-  python -m server.run_processor --loop --run-dir mytest                       # one run after another: after END_OF_RUN (or a lost link) wait for the next Unity run (restart or another scenario); runs/mytest, mytest_2, ...
-
-Live: start this first, then press Play in Unity. With --run-dir the processor chooses the folder and tells Unity in
-the READY message, so Unity writes its logs into the same folder. Without --run-dir neither side writes a run folder
-(and there is no stream.bin, so no recording and no end-of-run boundary check).
-"""
 import argparse
 import dataclasses
 import math

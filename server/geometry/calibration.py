@@ -1,13 +1,3 @@
-"""Calibration data sent by the simulator: ego geometry, sensor mounts, camera intrinsics, LiDAR beam tables.
-
-Conventions (right-handed, same as the whole processor):
-  vehicle frame: origin at the centre of the rear axle at ground level, x forward, y left, z up
-  mount angles in degrees: yaw positive to the left, pitch positive up, roll by the right-hand rule about the
-  forward axis, applied intrinsically in the order yaw, pitch, roll
-  camera optical frame (for projection): x right, y down, z forward; pixel (0, 0) is the top-left corner of the
-  image and pixel i covers [i, i + 1)
-  range image: row 0 = highest beam, column 0 = leftmost (azimuth positive to the left)
-"""
 from __future__ import annotations
 
 import json

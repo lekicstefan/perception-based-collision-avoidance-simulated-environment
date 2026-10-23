@@ -1,17 +1,3 @@
-"""CPU affinity and priority of the processor (section 4.2: Unity and Python are pinned to separate cores in all timing experiments).
-
-Why: on a machine with performance and efficiency cores (hybrid CPUs) the operating system may move a process that never idles onto the slower
-cores. In the first live smoke tests this doubled the cost of a scan (about 45 ms measured in a replay, about 100 ms live) until the processor was pinned
-to two performance cores, after which the live cost matched the replay. Pinning is therefore part of every timing experiment, and the run summary records it.
-
-  parse_cpu_list("2,4") -> [2, 4]        parse_cpu_list("2-5") -> [2, 3, 4, 5]
-  pin_process([2, 4])                    pins THIS process (all its threads) to logical CPUs 2 and 4 and raises its priority
-
-Windows: SetProcessAffinityMask and SetPriorityClass(HIGH) through ctypes (no extra package). Linux: os.sched_setaffinity, and a nicer priority when the
-user may set it. Other systems: NotImplementedError. Which logical CPUs are performance cores depends on the machine (on an i5-12600KF the logical CPUs
-0 to 11 are the six performance cores with two threads each, 12 to 15 the efficiency cores); two CPUs from different cores (for example 2 and 4) avoid sharing
-a core between the processor's two busy threads.
-"""
 from __future__ import annotations
 
 import ctypes

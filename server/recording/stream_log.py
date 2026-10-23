@@ -1,17 +1,3 @@
-"""Recording of the sensor stream (step 4.8): <run folder>/python/stream.bin.
-
-The processor writes every message exactly as it received it (bytes of docs/protocol.md), so a replay feeds the
-same input to the same code. File layout, little-endian:
-
-    8 bytes   magic "AVREC001"
-    then records, until the end of the file:
-        float64   arrival time in seconds since the first record (wall clock of the processor)
-        uint32    length of the message
-        bytes     the message, header included
-
-It contains the data messages (LIDAR, CAMERA, POSE, ORACLE), the first CALIBRATION and the first END_OF_RUN. A file
-cut off by a crash is read up to the last complete record.
-"""
 from __future__ import annotations
 
 import struct

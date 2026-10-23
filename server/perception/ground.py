@@ -1,28 +1,3 @@
-"""Ground removal (step 5.3).
-
-Marks the cells of a RangeImage that hit the road, so the segmentation (step 5.4) only sees things standing on it.
-Ground removal is needed on every road, not only on slopes: with the sensor 1.8 m up, a -1 degree beam meets flat ground at
-about 100 m, so several near-horizon beams return ground out to the range limit. Those returns form long rows of similar
-ranges that the beta criterion would cluster as objects and merge with anything standing on the road. The pipeline is
-therefore never run without ground removal; there is deliberately no "none" method.
-
-Two methods, selectable in GroundConfig (the ablation of step 11 compares them):
-
-  HEIGHT       flat-ground height filter. A cell is ground when its point lies less than height_tol_m above the nominal
-               ground plane. The plane passes through the vehicle origin (rear axle, ground level) and is tilted by the
-               car's pitch from the pose. Simple and fast, but it assumes the road is one plane: ahead of a slope or
-               a crest the road leaves the plane and is reported as obstacles (scenario 9).
-  RANGE_IMAGE  range-image ground estimation, after Bogoslavskyi and Stachniss. Per column, from the lowest beam upwards:
-               a cell is ground when the line from the last ground cell of that column to it is flatter than
-               slope_tol_deg. The first comparison is against the point on the ground under the sensor. A road that
-               bends up or down is followed as long as it stays within the slope tolerance, a wall or a car front is
-               steeper and breaks the chain. Cells without a return are skipped (the chain continues over them).
-
-Slopes are measured in a level frame: the vehicle frame turned by the car's pitch, so "level" means level in the world.
-Pitch sign: positive = nose up (as the mount pitch of the calibration). Roll is not used.
-
-Both functions return a boolean (rows, cols) array, True = ground. Only cells with a return can be ground.
-"""
 from __future__ import annotations
 
 import math

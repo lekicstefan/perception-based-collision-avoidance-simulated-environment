@@ -1,11 +1,3 @@
-"""The processing cycle (spec section 4.2). At a fixed rate it drains everything that arrived, orders it by
-timestamp, lets the processor handle it once, and sends at most one command.
-
-Timing: deadline = period (33 ms at 30 FPS). A cycle that takes longer than the period is an overrun. The runner
-never tries to catch up with a burst of cycles: after a late cycle the next one simply starts right away. When more scans are waiting than the
-processor can handle (`SheddingConfig.max_scans_per_cycle`), the older ones are skipped and counted (shedding.py): the backlog is bounded.
-With a RunLog every cycle and every command is written to the run folder (python/cycles.csv, python/commands.csv).
-"""
 from __future__ import annotations
 
 import dataclasses
