@@ -7,33 +7,36 @@ using UnityEngine.Rendering;
 // whatever is switched on.
 //
 // Keys (click the Game view first; ignored while a text field has the keyboard):
-//   1-9 or C / Shift+C   camera (the cameras below the Vehicle, in name order)
-//   D   lidar dots: off / objects / all returns
-//   B   lidar beams: off / one ring / sparse grid / objects      , and .   move the ring to another beam row
-//   L   lidar view in the corner: off / range image / bird's-eye
-//   V   camera view in the corner (the image the processor receives)
-//   G   boxes around the Hazard objects (ground truth)
-//   T   the route
-//   H   hide / show the whole HUD (for screenshots)
-// The choices are kept when the scene is restarted. Run-control keys (R, P, X, +, -, 0) belong to the ScenarioManager.
+//   1-9    camera (the cameras below the Vehicle, in name order)      W / Shift+W   next / previous camera
+//   Q      camera view in the corner (the image the processor receives)
+//   A      lidar view in the corner: off / range image / bird's-eye / both
+//   S      lidar dots: off / objects / all returns
+//   D      lidar beams: off / one row / grid / objects               F and G   move the beam row down / up (always works, used by "row")
+//   Z      dashboard (the system's live state, from the processor's telemetry)
+//   X      minimap under the dashboard (tracks, virtual hazards, ground truth)
+//   C      tracks as boxes on the camera picture
+//   V      the route                B   boxes around the Hazard objects (ground truth)
+//   Tab    hide / show all panels and pictures (for screenshots)
+//   Shift+Tab   hide / show the effects in the world (dots, beams, boxes, route, tracks); they stay switched on, they are only not drawn
+// The choices are kept when the scene is restarted. Run-control keys (Esc, Space, E, R, arrows, 0) belong to the ScenarioManager.
 [DefaultExecutionOrder(-250)]
 public class ViewControls : MonoBehaviour
 {
     public enum DotMode { Off, Objects, All }
     public enum BeamMode { Off, Ring, Sparse, Objects }
-    public enum LidarViewMode { Off, RangeImage, BirdsEye }
+    public enum LidarViewMode { Off, RangeImage, BirdsEye, Both }
 
     [Header("Wiring (found in the scene when left empty)")]
     public Vehicle vehicle;
     public RouteDriver driver;
     public LidarSensor lidar;
     public CameraSensor cameraSensor;
+    public NetworkHost network;
     [Tooltip("Parent of the view cameras. Empty: every camera below the Vehicle that renders to the screen.")]
     public Transform cameraRoot;
 
     [Header("Start values (first run of a session; restarts keep what you chose)")]
     public int startCamera = 0;
-    public DotMode startDots = DotMode.Objects;
     public BeamMode startBeams = BeamMode.Off;
     public LidarViewMode startLidarView = LidarViewMode.Off;
     public bool startCameraView = true;
@@ -56,17 +59,20 @@ public class ViewControls : MonoBehaviour
     static BeamMode beams;
     static LidarViewMode lidarView;
     static bool cameraView, groundTruthBoxes, routeLine;
+    static bool dashboardOn, minimapOn, trackOverlayOn, effectsHidden;
     static bool hudVisible = true;
     static int ringRow = -1;
 
     public static bool HudVisible { get { return hudVisible; } }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() { initialised = false; hudVisible = true; ringRow = -1; }
+    static void ResetStatics() { initialised = false; hudVisible = true; ringRow = -1; dashboardOn = false; minimapOn = false; trackOverlayOn = false; effectsHidden = false; }
 
     readonly List<Camera> cams = new List<Camera>();
+    readonly Dictionary<Camera, int> ownDisplay = new Dictionary<Camera, int>();     // the Target Display each camera has in the scene
     readonly LidarOverlay overlay = new LidarOverlay();
     readonly LidarPanel panel = new LidarPanel();
+    readonly Dashboard dashboard = new Dashboard();
     Material mat;
     bool materialFailed, statsDefault;
     Vector3[] routePoints;
@@ -79,7 +85,7 @@ public class ViewControls : MonoBehaviour
         if (!initialised)
         {
             camIndex = startCamera;
-            dots = startDots;
+            dots = DotMode.Off;
             beams = startBeams;
             lidarView = startLidarView;
             cameraView = startCameraView;
@@ -92,9 +98,13 @@ public class ViewControls : MonoBehaviour
         if (driver == null) driver = FindFirstObjectByType<RouteDriver>();
         if (lidar == null) lidar = FindFirstObjectByType<LidarSensor>();
         if (cameraSensor == null) cameraSensor = FindFirstObjectByType<CameraSensor>();
+        if (network == null) network = FindFirstObjectByType<NetworkHost>();
 
         FindCameras();
-        if (lidar != null) statsDefault = lidar.showStats;
+        // the one-line stats of the sensors sat on top of the run panel and the dashboard shows the same numbers
+        statsDefault = false;
+        PoseEstimator pose = FindFirstObjectByType<PoseEstimator>();
+        if (pose != null) pose.showStats = false;
     }
 
     void FindCameras()
@@ -105,6 +115,8 @@ public class ViewControls : MonoBehaviour
         foreach (Camera c in found)
             if (c.targetTexture == null && c.name != "SensorCamera") cams.Add(c);     // the sensor camera renders to a texture and is not a view
         cams.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+        ownDisplay.Clear();
+        foreach (Camera c in cams) ownDisplay[c] = c.targetDisplay;
 
         if (cams.Count == 0)
         {
@@ -116,15 +128,28 @@ public class ViewControls : MonoBehaviour
     }
 
     // Only the chosen camera renders, and only its audio listener is on (several of them produce a warning every frame).
+    // The Game view shows Display 1, so the chosen camera is sent to Display 1 whatever its Target Display is in the scene (the cameras of the
+    // car are set to Display 1 to 5 so that each can be watched in its own Game window); the others get their own display back.
+    // A camera on an inactive object does not render whatever its own switch says, so the chosen camera's object and its parents are switched on first.
     void ApplyCamera()
     {
+        if (cams.Count == 0) return;
+        Camera target = cams[camIndex];
+        for (Transform t = target.transform; t != null; t = t.parent)
+            if (!t.gameObject.activeSelf)
+            {
+                UnityEngine.Debug.Log("VIEW CONTROLS: '" + t.name + "' was inactive, switched on so that the camera '" + target.name + "' can render");
+                t.gameObject.SetActive(true);
+            }
         for (int i = 0; i < cams.Count; i++)
         {
             bool on = i == camIndex;
+            cams[i].targetDisplay = on ? 0 : ownDisplay[cams[i]];
             cams[i].enabled = on;
             AudioListener al = cams[i].GetComponent<AudioListener>();
             if (al != null) al.enabled = on;
         }
+        UnityEngine.Debug.Log("VIEW | camera '" + target.name + "' (" + (camIndex + 1) + " of " + cams.Count + ") on Display 1 (its own: " + (ownDisplay[target] + 1) + ") | rendering: " + target.isActiveAndEnabled);
     }
 
     void OnEnable()
@@ -156,11 +181,15 @@ public class ViewControls : MonoBehaviour
     void NextCamera(int delta) { SelectCamera(camIndex + delta); }
     void CycleDots() { dots = (DotMode)(((int)dots + 1) % 3); }
     void CycleBeams() { beams = (BeamMode)(((int)beams + 1) % 4); }
-    void CycleLidarView() { lidarView = (LidarViewMode)(((int)lidarView + 1) % 3); }
+    void CycleLidarView() { lidarView = (LidarViewMode)(((int)lidarView + 1) % 4); }
     void ToggleCameraView() { cameraView = !cameraView; }
     void ToggleBoxes() { groundTruthBoxes = !groundTruthBoxes; }
     void ToggleRoute() { routeLine = !routeLine; }
     void ToggleHud() { hudVisible = !hudVisible; }
+    void ToggleEffects() { effectsHidden = !effectsHidden; }
+    void ToggleDashboard() { dashboardOn = !dashboardOn; }
+    void ToggleMinimap() { minimapOn = !minimapOn; }
+    void ToggleTrackOverlay() { trackOverlayOn = !trackOverlayOn; }
 
     int Rows { get { return lidar != null && lidar.rig != null && lidar.rig.Config != null ? lidar.rig.Config.lidar.Rows : 0; } }
 
@@ -196,7 +225,7 @@ public class ViewControls : MonoBehaviour
         if (lidar != null)
         {
             lidar.showStats = hudVisible && statsDefault;
-            bool need = dots != DotMode.Off || beams != BeamMode.Off || lidarView == LidarViewMode.BirdsEye;
+            bool need = dots != DotMode.Off || beams != BeamMode.Off || lidarView == LidarViewMode.BirdsEye || lidarView == LidarViewMode.Both;
             if (need) overlay.Refresh(lidar);
             if (hudVisible && lidarView != LidarViewMode.Off && vehicle != null)
                 panel.Refresh(lidar, overlay, lidarView, vehicle.transform, birdsEyeRangeM);
@@ -233,6 +262,7 @@ public class ViewControls : MonoBehaviour
         if (cam.targetTexture != null) return;       // sensor cameras render to textures: never draw into them
         if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
         bool anyLidar = lidar != null && (dots != DotMode.Off || beams != BeamMode.Off) && overlay.Count > 0;
+        if (effectsHidden) return;
         if (!anyLidar && !groundTruthBoxes && !routeLine) return;
         if (!EnsureMaterial()) return;
 
@@ -290,82 +320,139 @@ public class ViewControls : MonoBehaviour
         {
             if (k - KeyCode.Alpha1 < cams.Count) SelectCamera(k - KeyCode.Alpha1);
             e.Use();
+            return;
         }
-        else if (k == KeyCode.C) { NextCamera(e.shift ? -1 : 1); e.Use(); }
-        else if (k == KeyCode.D) { CycleDots(); e.Use(); }
-        else if (k == KeyCode.B) { CycleBeams(); e.Use(); }
-        else if (k == KeyCode.L) { CycleLidarView(); e.Use(); }
-        else if (k == KeyCode.V) { ToggleCameraView(); e.Use(); }
-        else if (k == KeyCode.G) { ToggleBoxes(); e.Use(); }
-        else if (k == KeyCode.T) { ToggleRoute(); e.Use(); }
-        else if (k == KeyCode.H) { ToggleHud(); e.Use(); }
-        else if (k == KeyCode.None)
+        switch (k)
         {
-            if (e.character == ',') { MoveRing(-1); e.Use(); }
-            else if (e.character == '.') { MoveRing(1); e.Use(); }
+            case KeyCode.W: NextCamera(e.shift ? -1 : 1); break;
+            case KeyCode.Q: ToggleCameraView(); break;
+            case KeyCode.A: CycleLidarView(); break;
+            case KeyCode.S: CycleDots(); break;
+            case KeyCode.D: CycleBeams(); break;
+            case KeyCode.F: MoveRing(-1); break;
+            case KeyCode.G: MoveRing(1); break;
+            case KeyCode.Z: ToggleDashboard(); break;
+            case KeyCode.X: ToggleMinimap(); break;
+            case KeyCode.C: ToggleTrackOverlay(); break;
+            case KeyCode.V: ToggleRoute(); break;
+            case KeyCode.B: ToggleBoxes(); break;
+            case KeyCode.Tab: if (e.shift) ToggleEffects(); else ToggleHud(); break;
+            default: return;
         }
-    }
-
-    static bool Row(string label, string value)
-    {
-        GUILayout.BeginHorizontal();
-        GUILayout.Label(label, GUILayout.Width(92f));
-        bool clicked = GUILayout.Button(value);
-        GUILayout.EndHorizontal();
-        return clicked;
+        e.Use();
     }
 
     static string BeamName(BeamMode m)
     {
         switch (m)
         {
-            case BeamMode.Ring: return "one ring";
-            case BeamMode.Sparse: return "sparse grid";
-            case BeamMode.Objects: return "objects only";
-            default: return "off";
+            case BeamMode.Ring: return "Row";
+            case BeamMode.Sparse: return "Grid";
+            case BeamMode.Objects: return "Objects";
+            default: return "OFF";
         }
     }
 
+    static string OnOff(bool on) { return on ? "ON" : "OFF"; }
+
+    // first letter big, the rest small ("Front_camera")
+    static string Sentence(string s) { return string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s.Substring(1).ToLowerInvariant(); }
+
+    const float PanelW = 310f, DividerH = 11f;
+
+    // one row of the view panel: label, the button with the current value (centred), the key
+    static bool ViewRow(ref Rect inner, string label, string value, string key)
+    {
+        Rect[] c = UiTheme.Cols(UiTheme.NextRow(ref inner), 92f, 0f, 44f);
+        GUI.Label(c[0], label, UiTheme.Muted);
+        bool clicked = UiTheme.Press(c[1], value);
+        GUI.Label(c[2], key, UiTheme.Right);
+        return clicked;
+    }
+
+    // a little space, a thin line, a little space (the row before has its usual gap already)
+    static void Divider(ref Rect inner)
+    {
+        UiTheme.Separator(new Rect(inner.x, inner.y + 2f, inner.width, 1f));
+        inner.y += DividerH;
+        inner.height -= DividerH;
+    }
+
+    static GUIStyle centredValue;
+
     void OnGUI()
+    {
+        GUI.depth = 10;      // behind the camera preview that the camera sensor draws, so tracks and panels never cover it
+        UiTheme.Begin();
+        DrawUi();
+        UiTheme.End();
+    }
+
+    void DrawUi()
     {
         Event e = Event.current;
         if (hotkeys && e.type == EventType.KeyDown && GUIUtility.keyboardControl == 0 && !e.control && !e.alt) HandleKey(e);
+        UiTheme.Ensure();
 
-        if (!hudVisible)
-        {
-            if (e.type == EventType.Repaint) GUI.Label(new Rect(Screen.width - 130f, Screen.height - 24f, 120f, 20f), "H = show HUD");
-            return;
-        }
+        if (!hudVisible) return;
+
+        if (trackOverlayOn && !effectsHidden && cams.Count > 0) dashboard.DrawOverlay(cams[camIndex], vehicle, network);      // first: the pictures and panels are drawn over it
 
         // corner pictures: the camera preview (drawn by the camera sensor) is on top, the lidar view goes below it
         float top = 10f;
         if (cameraSensor != null && cameraSensor.showPreview && cameraSensor.LastFrame != null && cameraSensor.LastFrame.format == "jpeg")
             top += 320f * cameraSensor.LastFrame.height / cameraSensor.LastFrame.width + 28f;
         if (lidarView != LidarViewMode.Off && lidar != null && lidar.LastScan != null)
-            panel.Draw(Screen.width - 10f, top, lidarView, lidar.LastScan.frameId, birdsEyeRangeM);
+            panel.Draw(UiTheme.W - 10f, top, lidarView, lidar.LastScan.frameId, birdsEyeRangeM);
 
-        // the panel with the switches
-        float w = 360f, h = lidarView != LidarViewMode.Off || beams == BeamMode.Ring ? 250f : 226f;
-        GUILayout.BeginArea(new Rect(Screen.width - w - 10f, Screen.height - h - 10f, w, h), GUI.skin.box);
-        GUILayout.Label("VIEW   (click the Game view first, H hides everything)");
+        if (dashboardOn) dashboard.Draw(new Rect(12f, 12f, Dashboard.Width, Dashboard.Height), vehicle, network);
+        if (minimapOn) dashboard.DrawMap(new Rect(12f, 12f + (dashboardOn ? Dashboard.Height + 8f : 0f), Dashboard.Width, Dashboard.MapHeight), vehicle, network);
 
-        string camName = cams.Count > 0 ? cams[camIndex].name + "  (" + (camIndex + 1) + "/" + cams.Count + ")" : "none found";
-        if (Row("Camera [1-9, C]", camName)) NextCamera(Event.current.shift ? -1 : 1);
-        if (Row("Lidar dots [D]", dots == DotMode.Off ? "off" : dots == DotMode.Objects ? "objects" : "all returns")) CycleDots();
-        if (Row("Lidar beams [B]", BeamName(beams) + (beams != BeamMode.Off ? "  (" + lastBeamCount + " drawn)" : ""))) CycleBeams();
-        if (beams == BeamMode.Ring)
+        if (centredValue == null) centredValue = new GUIStyle(UiTheme.Value) { alignment = TextAnchor.MiddleCenter };
+
+        // the panel with the switches: a fixed width, exactly as high as its rows and dividers
+        float h = UiTheme.PanelHeight(11) + 3f * DividerH;
+        Rect inner = UiTheme.Panel(new Rect(UiTheme.W - PanelW - 12f, UiTheme.H - h - 12f, PanelW, h));
+
+        string camName = cams.Count > 0 ? Sentence(cams[camIndex].name) + " (" + (camIndex + 1) + "/" + cams.Count + ")" : "None found";
+        if (ViewRow(ref inner, "Camera view", OnOff(cameraView), "Q")) ToggleCameraView();
+        if (ViewRow(ref inner, "Cycle camera", camName, "W  1-5")) NextCamera(Event.current.shift ? -1 : 1);
+        Divider(ref inner);
+
+        if (ViewRow(ref inner, "Lidar view", LidarViewName(), "A")) CycleLidarView();
+        if (ViewRow(ref inner, "Lidar dots", dots == DotMode.Off ? "OFF" : dots == DotMode.Objects ? "Objects" : "All returns", "S")) CycleDots();
+        if (ViewRow(ref inner, "Lidar beams", BeamName(beams) + (beams != BeamMode.Off ? "  (" + lastBeamCount + ")" : ""), "D")) CycleBeams();
+
+        // the beam row: always there, dimmed while the beams are not on "row"
+        Color old = GUI.color;
+        if (beams != BeamMode.Ring) GUI.color = new Color(1f, 1f, 1f, 0.4f);
+        Rect[] c = UiTheme.Cols(UiTheme.NextRow(ref inner), 92f, 0f, 44f);
+        GUI.Label(c[0], "Beam row", UiTheme.Muted);
+        Rect[] b = UiTheme.Cols(c[1], 30f, 0f, 30f);
+        if (UiTheme.Press(b[0], "<")) MoveRing(-1);
+        GUI.Label(b[1], Rows > 0 ? (RingRow() + 1) + " of " + Rows : "-", centredValue);
+        if (UiTheme.Press(b[2], ">")) MoveRing(1);
+        GUI.Label(c[2], "F  G", UiTheme.Right);
+        GUI.color = old;
+        Divider(ref inner);
+
+        if (ViewRow(ref inner, "Dashboard", OnOff(dashboardOn), "Z")) ToggleDashboard();
+        if (ViewRow(ref inner, "Minimap", OnOff(minimapOn), "X")) ToggleMinimap();
+        Divider(ref inner);
+
+        if (ViewRow(ref inner, "Track", OnOff(trackOverlayOn), "C")) ToggleTrackOverlay();
+        if (ViewRow(ref inner, "Route", OnOff(routeLine), "V")) ToggleRoute();
+        if (ViewRow(ref inner, "Hazard boxes", OnOff(groundTruthBoxes), "B")) ToggleBoxes();
+    }
+
+    static string LidarViewName()
+    {
+        switch (lidarView)
         {
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("Ring beam row", GUILayout.Width(92f));
-            if (GUILayout.Button("<", GUILayout.Width(30f))) MoveRing(-1);
-            GUILayout.Label((RingRow() + 1) + " of " + Rows + "   [ , . ]");
-            if (GUILayout.Button(">", GUILayout.Width(30f))) MoveRing(1);
-            GUILayout.EndHorizontal();
+            case LidarViewMode.RangeImage: return "Range image";
+            case LidarViewMode.BirdsEye: return "Bird's-eye";
+            case LidarViewMode.Both: return "Both";
+            default: return "OFF";
         }
-        if (Row("Lidar view [L]", lidarView == LidarViewMode.Off ? "off" : lidarView == LidarViewMode.RangeImage ? "range image" : "bird's-eye")) CycleLidarView();
-        if (Row("Camera view [V]", cameraView ? "on" : "off")) ToggleCameraView();
-        if (Row("Hazard boxes [G]", groundTruthBoxes ? "on" : "off")) ToggleBoxes();
-        if (Row("Route [T]", routeLine ? "on" : "off")) ToggleRoute();
-        GUILayout.EndArea();
     }
 }

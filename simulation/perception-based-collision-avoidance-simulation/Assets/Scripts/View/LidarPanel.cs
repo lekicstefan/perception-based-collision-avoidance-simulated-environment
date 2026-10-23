@@ -29,8 +29,10 @@ public class LidarPanel
     {
         LidarScan scan = lidar.LastScan;
         if (scan == null) return;
-        if (mode == ViewControls.LidarViewMode.RangeImage && scan.frameId != rangeFrame) BuildRange(lidar, scan);
-        else if (mode == ViewControls.LidarViewMode.BirdsEye && (scan.frameId != bevFrame || !Mathf.Approximately(birdsEyeRangeM, bevRange))) BuildBirdsEye(cache, ego, birdsEyeRangeM, scan.frameId);
+        bool range = mode == ViewControls.LidarViewMode.RangeImage || mode == ViewControls.LidarViewMode.Both;
+        bool bev = mode == ViewControls.LidarViewMode.BirdsEye || mode == ViewControls.LidarViewMode.Both;
+        if (range && scan.frameId != rangeFrame) BuildRange(lidar, scan);
+        if (bev && (scan.frameId != bevFrame || !Mathf.Approximately(birdsEyeRangeM, bevRange))) BuildBirdsEye(cache, ego, birdsEyeRangeM, scan.frameId);
     }
 
     void BuildRange(LidarSensor lidar, LidarScan scan)
@@ -78,7 +80,6 @@ public class LidarPanel
         fwd.Normalize();
         Vector3 right = Vector3.Cross(Vector3.up, fwd);
         float pxPerM = BevSize / (2f * range);
-        validCount = cache.Count;
 
         for (int pass = 1; pass <= 2; pass++)           // ground first, objects on top
         {
@@ -134,25 +135,27 @@ public class LidarPanel
                 bevBg[(BevSize / 2 + dy) * BevSize + (BevSize / 2 + dx)] = car;
     }
 
-    // Draws the panel with its right edge at rightX and its top at top. Returns the height it used.
+    // Draws the picture(s) with the right edge at rightX and the top at top: the range image, the bird's-eye plot, or both (range image on top).
+    // Returns the height it used.
     public float Draw(float rightX, float top, ViewControls.LidarViewMode mode, int frameId, float birdsEyeRangeM)
     {
-        if (mode == ViewControls.LidarViewMode.RangeImage && rangeTex != null)
+        float used = 0f;
+        if ((mode == ViewControls.LidarViewMode.RangeImage || mode == ViewControls.LidarViewMode.Both) && rangeTex != null)
         {
-            float w = Mathf.Min(rangeTex.width, Screen.width - 20f);
+            float w = Mathf.Min(rangeTex.width, UiTheme.W - 20f);
             float h = rangeTex.height * RangeRowScale;
-            var r = new Rect(rightX - w, top, w, h);
+            var r = new Rect(rightX - w, top + used, w, h);
             GUI.DrawTexture(r, rangeTex, ScaleMode.StretchToFill);
             GUI.Label(new Rect(r.x, r.yMax + 1f, w, 22f), "lidar range image, scan " + frameId + " | " + validCount + " returns | red near, blue far, black nothing, purple no return");
-            return h + 24f;
+            used += h + 24f;
         }
-        if (mode == ViewControls.LidarViewMode.BirdsEye && bevTex != null)
+        if ((mode == ViewControls.LidarViewMode.BirdsEye || mode == ViewControls.LidarViewMode.Both) && bevTex != null)
         {
-            var r = new Rect(rightX - BevSize, top, BevSize, BevSize);
+            var r = new Rect(rightX - BevSize, top + used, BevSize, BevSize);
             GUI.DrawTexture(r, bevTex, ScaleMode.StretchToFill);
             GUI.Label(new Rect(r.x - 90f, r.yMax + 1f, BevSize + 90f, 22f), "bird's-eye, " + birdsEyeRangeM.ToString("0") + " m radius, heading up | scan " + frameId);
-            return BevSize + 24f;
+            used += BevSize + 24f;
         }
-        return 0f;
+        return used;
     }
 }

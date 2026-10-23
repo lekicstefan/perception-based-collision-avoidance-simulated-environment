@@ -27,17 +27,24 @@ public class CollisionDetector : MonoBehaviour
         Collider[] hits = Physics.OverlapBox(center, half, t.rotation, hazardMask, QueryTriggerInteraction.Ignore);
         string hazardName = hits.Length > 0 ? hits[0].name : "unknown";
         float impact = vehicle.Speed;
-        RunControl.EndWithCollision(SimClock.Now, impact, hazardName, vehicle.transform.position);
+        RunControl.EndWithCollision(Time.fixedTimeAsDouble, impact, hazardName, vehicle.transform.position);
         vehicle.Freeze();
-        UnityEngine.Debug.Log("COLLISION at t=" + SimClock.Now.ToString("F2") + " s | impact speed " +
+        UnityEngine.Debug.Log("COLLISION at t=" + Time.fixedTimeAsDouble.ToString("F2") + " s | impact speed " +
             impact.ToString("F2") + " m/s (" + (impact * 3.6f).ToString("F1") + " km/h) | hazard '" + hazardName +
             "' | " + hits.Length + " collider(s) overlapped");
     }
 
     void OnGUI()
     {
+        UiTheme.Begin();
+        DrawUi();
+        UiTheme.End();
+    }
+
+    void DrawUi()
+    {
         if (!RunControl.Ended || RunControl.Reason != RunControl.EndReason.Collision) return;
-        GUI.Label(new Rect(Screen.width * 0.5f - 160f, 10f, 360f, 25f),
+        GUI.Label(new Rect(UiTheme.W * 0.5f - 160f, 10f, 360f, 25f),
             "COLLISION: impact speed " + RunControl.ImpactSpeed.ToString("F2") + " m/s (" +
             (RunControl.ImpactSpeed * 3.6f).ToString("F1") + " km/h) with " + RunControl.HazardName);
     }

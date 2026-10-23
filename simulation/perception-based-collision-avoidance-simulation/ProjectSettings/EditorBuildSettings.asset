@@ -6,8 +6,8 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/DevTestScene.unity
-    guid: 9f5a4e77f0b80ae4db9c8f3774bb39e2
+    path: Assets/Scenes/Menu.unity
+    guid: 42a0e3cb1c329824d9922bec4b44f18c
   - enabled: 1
     path: Assets/Scenes/S1_StationaryObstacle.unity
     guid: 48bf6b359ad88614bb7dc4b8c3b63685
@@ -17,6 +17,30 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/S3_BrakingLeadVehicle.unity
     guid: b3f88e65083781e4d8b0c3bc4c0711f2
+  - enabled: 1
+    path: Assets/Scenes/S4_CrossingPedestrian.unity
+    guid: ddb02d9e9bb88b74cba8649bb4719210
+  - enabled: 1
+    path: Assets/Scenes/S5_NarrowStreet.unity
+    guid: c62c91159ce244645b083404d8bfdbd4
+  - enabled: 1
+    path: Assets/Scenes/S6_NarrowStreetStanding.unity
+    guid: 203496ba225dcaa44ad76ca1af953416
+  - enabled: 1
+    path: Assets/Scenes/S7_NegativeControl.unity
+    guid: 85dbb36cac7d4e3479d071b19c3472ca
+  - enabled: 1
+    path: Assets/Scenes/S8_CatCrossing.unity
+    guid: 05d52a69912ca314f9edd16aa5e13c6c
+  - enabled: 1
+    path: Assets/Scenes/S9_CrestHiddenVehicle.unity
+    guid: fca1211952ebc794ab16f8b42fc2afdd
+  - enabled: 1
+    path: Assets/Scenes/S10_BlindBend.unity
+    guid: b5ad975bd1eb3bb4abb60088f5f703af
+  - enabled: 1
+    path: Assets/Scenes/DevTestScene.unity
+    guid: 9f5a4e77f0b80ae4db9c8f3774bb39e2
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 289c1b55c9541489481df5cc06664110, type: 3}
   m_UseUCBPForAssetBundles: 0

@@ -147,7 +147,7 @@ public class CameraSensor : MonoBehaviour
     void FixedUpdate()
     {
         if (cam == null) return;
-        double now = SimClock.Now;
+        double now = Time.fixedTimeAsDouble;
         if (!schedule.Due(now, Time.fixedDeltaTime)) return;
 
         ApplyFog();
@@ -251,9 +251,16 @@ public class CameraSensor : MonoBehaviour
 
     void OnGUI()
     {
+        UiTheme.Begin();
+        DrawUi();
+        UiTheme.End();
+    }
+
+    void DrawUi()
+    {
         if (!showPreview || previewTex == null || LastFrame == null || LastFrame.format != "jpeg") return;
         float w = 320f, h = w * cfg.height / cfg.width;
-        var r = new Rect(Screen.width - w - 10f, 10f, w, h);
+        var r = new Rect(UiTheme.W - w - 10f, 10f, w, h);
         GUI.DrawTexture(r, previewTex);
         GUI.Label(new Rect(r.x, r.yMax + 2f, w, 20f), "camera frame " + LastFrame.frameId + " | " + LastFrame.data.Length + " bytes");
     }

@@ -21,7 +21,7 @@ using static System.Net.Mime.MediaTypeNames;
 // marked as not valid for experiments in run.json (end.outcome.validForExperiments). Every new run starts at 1x.
 //
 // Keys (click the Game view first; ignored while a text field has the keyboard):
-//   R restart   P pause / resume   X end the run   M back to the menu   + faster   - slower   0 back to 1x
+//   Esc back to the menu   Space pause / resume   E end the run   R restart   Up / Right faster   Down / Left slower   0 back to 1x
 //
 // The scene must be listed in the Build Settings for a restart to work (File > Build Profiles > Scene List).
 [DefaultExecutionOrder(-400)]   // before ScenarioSettings (-300) and everything else: resets the per-run statics first
@@ -51,9 +51,9 @@ public class ScenarioManager : MonoBehaviour
     string pendingScene;                  // a scene to load when the run has ended (the menu)
     float stoppedFor;
     string endText = "";
+    string endDetail = "";                // the same for the HUD: time, impact speed
     int scaleIndex = 2;
     double pauseStartReal;
-    GUIStyle warnStyle;
 
     void Awake()
     {
@@ -149,6 +149,10 @@ public class ScenarioManager : MonoBehaviour
         if (RunControl.Reason == RunControl.EndReason.Collision)
             endText += " | impact " + RunControl.ImpactSpeed.ToString("F2") + " m/s (" + (RunControl.ImpactSpeed * 3.6f).ToString("F1") + " km/h) with " + RunControl.HazardName;
         if (!RunOutcome.ValidForExperiments) endText += " | NOT VALID FOR EXPERIMENTS (time scale changed)";
+        endDetail = "t " + RunControl.EndTime.ToString("F2") + " s";
+        if (RunControl.Reason == RunControl.EndReason.Collision)
+            endDetail += "    impact " + (RunControl.ImpactSpeed * 3.6f).ToString("F1") + " km/h with " + RunControl.HazardName;
+        else endDetail += "    " + (vehicle.Speed * 3.6f).ToString("F0") + " km/h at the end";
         UnityEngine.Debug.Log("RUN END | " + endText + " | speed " + vehicle.Speed.ToString("F2") + " m/s | route " + progress.ToString("F1") + " of " + length.ToString("F1") + " m" +
                               (RunOutcome.Pauses > 0 ? " | paused " + RunOutcome.Pauses + " time(s), " + RunOutcome.PausedRealS.ToString("F1") + " s" : ""));
 
@@ -286,61 +290,87 @@ public class ScenarioManager : MonoBehaviour
 
     void HandleKey(Event e)
     {
-        if (e.keyCode == KeyCode.R) { Restart(); e.Use(); }
-        else if (e.keyCode == KeyCode.P) { TogglePause(); e.Use(); }
-        else if (e.keyCode == KeyCode.X) { EndRun(); e.Use(); }
-        else if (e.keyCode == KeyCode.M) { ToMenu(); e.Use(); }
-        else if (e.keyCode == KeyCode.Alpha0 || e.keyCode == KeyCode.Keypad0) { ResetSpeed(); e.Use(); }
-        else if (e.keyCode == KeyCode.None)
+        switch (e.keyCode)
         {
-            // Symbols are read from the typed character, so they work on every keyboard layout (a plus or a minus is not at the same place everywhere).
-            char c = e.character;
-            if (c == '+' || c == '=') { ChangeSpeed(1); e.Use(); }
-            else if (c == '-' || c == '_') { ChangeSpeed(-1); e.Use(); }
+            case KeyCode.Escape: ToMenu(); break;
+            case KeyCode.Space: TogglePause(); break;
+            case KeyCode.E: EndRun(); break;
+            case KeyCode.R: Restart(); break;
+            case KeyCode.UpArrow:
+            case KeyCode.RightArrow: ChangeSpeed(1); break;
+            case KeyCode.DownArrow:
+            case KeyCode.LeftArrow: ChangeSpeed(-1); break;
+            case KeyCode.Alpha0:
+            case KeyCode.Keypad0: ResetSpeed(); break;
+            default: return;
         }
+        e.Use();
     }
 
     void OnGUI()
+    {
+        UiTheme.Begin();
+        DrawUi();
+        UiTheme.End();
+    }
+
+    void DrawUi()
     {
         Event e = Event.current;
         if (hotkeys && e.type == EventType.KeyDown && GUIUtility.keyboardControl == 0 && !e.control && !e.alt) HandleKey(e);
 
         if (!showControls || !ViewControls.HudVisible) return;
+        UiTheme.Ensure();
 
-        if (warnStyle == null)
-        {
-            warnStyle = new GUIStyle(GUI.skin.label);
-            warnStyle.normal.textColor = new Color(1f, 0.35f, 0.3f);
-            warnStyle.fontStyle = FontStyle.Bold;
-        }
+        float h = UiTheme.PanelHeight(3);
+        Rect inner = UiTheme.Panel(new Rect(12f, UiTheme.H - h - 12f, 580f, h));
 
-        GUILayout.BeginArea(new Rect(10f, Screen.height - 132f, 740f, 96f), GUI.skin.box);
-        string scenario = ScenarioContext.Loaded ? ScenarioContext.Config.name : "(no scenario)";
-        string status;
+        // scenario name and state
+        Rect[] c = UiTheme.Cols(UiTheme.NextRow(ref inner), 0f, 190f);
+        GUI.Label(c[0], ScenarioContext.Loaded ? ScenarioContext.Config.name : "(no scenario)", UiTheme.Name);
         switch (State)
         {
-            case RunState.WaitingForProcessor: status = "waiting for the processor"; break;
+            case RunState.WaitingForProcessor: UiTheme.Status(c[1], "Waiting for processor", UiTheme.Tone.Warn); break;
             case RunState.Running:
-                status = (Paused ? "PAUSED" : "running") + ", t = " + SimClock.Now.ToString("F1") + " s, " +
-                         (vehicle != null ? (vehicle.Speed * 3.6f).ToString("F0") : "0") + " km/h, speed " + TimeScale.ToString("0.##") + "x";
+                if (Paused) UiTheme.Status(c[1], "Paused", UiTheme.Tone.Warn); else UiTheme.Status(c[1], "Running", UiTheme.Tone.Ok);
                 break;
-            default: status = "ENDED: " + endText; break;
+            default: UiTheme.Status(c[1], RunControl.Reason.ToString(), ReasonTone(RunControl.Reason)); break;
         }
-        GUILayout.Label("Scenario " + scenario + " | " + status);
-        GUILayout.Label(RunOutcome.TimeScaleChanged ? "Time scale was changed: this run is NOT valid for experiments" : " ", warnStyle);
 
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("Restart (R)", GUILayout.Width(100f))) Restart();
-        if (GUILayout.Button("Menu (M)", GUILayout.Width(90f))) ToMenu();
+        // numbers
+        bool invalid = RunOutcome.TimeScaleChanged;
+        c = invalid ? UiTheme.Cols(UiTheme.NextRow(ref inner), 0f, 190f) : UiTheme.Cols(UiTheme.NextRow(ref inner), 0f);
+        if (State == RunState.Running)
+            GUI.Label(c[0], "t " + SimClock.Now.ToString("F1") + " s   " + (vehicle != null ? (vehicle.Speed * 3.6f).ToString("F0") : "0") + " km/h   x" + TimeScale.ToString("0.##"), UiTheme.Value);
+        else if (State == RunState.Ended)
+            GUI.Label(c[0], endDetail, UiTheme.Value);
+        if (invalid) UiTheme.Status(c[1], "Not valid for experiments", UiTheme.Tone.Bad);
+
+        // buttons
+        // the first button is as wide for "Resume" as for "Pause"
+        c = UiTheme.Cols(UiTheme.NextRow(ref inner), 118f, 70f, 92f, 90f, 0f, 30f, 60f, 30f);
         GUI.enabled = State == RunState.Running;
-        if (GUILayout.Button(Paused ? "Resume (P)" : "Pause (P)", GUILayout.Width(100f))) TogglePause();
-        if (GUILayout.Button("End run (X)", GUILayout.Width(100f))) EndRun();
-        GUILayout.Space(12f);
-        if (GUILayout.Button("-", GUILayout.Width(30f))) ChangeSpeed(-1);
-        if (GUILayout.Button("1x (0)", GUILayout.Width(60f))) ResetSpeed();
-        if (GUILayout.Button("+", GUILayout.Width(30f))) ChangeSpeed(1);
+        if (UiTheme.Press(c[0], Paused ? "Resume  SPACE" : "Pause  SPACE")) TogglePause();
+        if (UiTheme.Press(c[1], "End  E")) EndRun();
         GUI.enabled = true;
-        GUILayout.EndHorizontal();
-        GUILayout.EndArea();
+        if (UiTheme.Press(c[2], "Restart  R")) Restart();
+        if (UiTheme.Press(c[3], "Menu  ESC")) ToMenu();
+        GUI.enabled = State == RunState.Running;
+        if (UiTheme.Press(c[5], "<")) ChangeSpeed(-1);
+        if (UiTheme.Press(c[6], "x" + Scales[scaleIndex] + "  0")) ResetSpeed();
+        if (UiTheme.Press(c[7], ">")) ChangeSpeed(1);
+        GUI.enabled = true;
+    }
+
+    static UiTheme.Tone ReasonTone(RunControl.EndReason r)
+    {
+        switch (r)
+        {
+            case RunControl.EndReason.Collision: return UiTheme.Tone.Bad;
+            case RunControl.EndReason.Timeout: return UiTheme.Tone.Warn;
+            case RunControl.EndReason.RouteFinished:
+            case RunControl.EndReason.Stopped: return UiTheme.Tone.Ok;
+            default: return UiTheme.Tone.Neutral;
+        }
     }
 }

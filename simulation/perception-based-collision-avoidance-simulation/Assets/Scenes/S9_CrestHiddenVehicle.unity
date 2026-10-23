@@ -2632,7 +2632,6 @@ GameObject:
   m_Component:
   - component: {fileID: 935829885}
   - component: {fileID: 935829884}
-  - component: {fileID: 935829883}
   - component: {fileID: 935829882}
   - component: {fileID: 935829886}
   - component: {fileID: 935829887}
@@ -2669,20 +2668,6 @@ MonoBehaviour:
   brakeRequest: 5
   validity: 2
   fallbackDecel: 3
---- !u!114 &935829883
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c5c14e980c7752a4b85bfb64be6c36de, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CommandDebugUI
-  executor: {fileID: 935829884}
-  vehicle: {fileID: 1128943756}
 --- !u!114 &935829884
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5904,6 +5889,7 @@ MonoBehaviour:
   driver: {fileID: 0}
   lidar: {fileID: 0}
   cameraSensor: {fileID: 0}
+  network: {fileID: 0}
   cameraRoot: {fileID: 0}
   startCamera: 0
   startDots: 1

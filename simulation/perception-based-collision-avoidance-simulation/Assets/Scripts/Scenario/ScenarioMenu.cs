@@ -19,7 +19,6 @@ public class ScenarioMenu : MonoBehaviour
 
     readonly List<Entry> entries = new List<Entry>();
     Vector2 scroll;
-    GUIStyle title, small, errorStyle;
 
     void Awake()
     {
@@ -76,45 +75,51 @@ public class ScenarioMenu : MonoBehaviour
 
     void OnGUI()
     {
-        if (title == null)
-        {
-            title = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold };
-            small = new GUIStyle(GUI.skin.label) { fontSize = 11, wordWrap = true };
-            errorStyle = new GUIStyle(small);
-            errorStyle.normal.textColor = new Color(1f, 0.4f, 0.3f);
-        }
+        UiTheme.Begin();
+        DrawUi();
+        UiTheme.End();
+    }
 
-        float w = Mathf.Min(Screen.width - 40f, 900f);
-        GUILayout.BeginArea(new Rect((Screen.width - w) * 0.5f, 20f, w, Screen.height - 40f));
-        GUILayout.Label("Scenarios", title);
-        GUILayout.Label("Start the processor first (python -m server.run_processor --pin 2,4 --run-dir NAME --loop), then pick a scenario. " +
-                        "In a scenario: R restart, P pause, X end the run, M back to this menu.", small);
-        string last = string.IsNullOrEmpty(ScenarioContext.Pick) ? "none yet" : ScenarioContext.Pick;
-        GUILayout.Label("Last scenario: " + last + "   (" + entries.Count + " scenario files)", small);
-        if (GUILayout.Button("Reload the list", GUILayout.Width(130f))) Refresh();
-        GUILayout.Space(6f);
+    void DrawUi()
+    {
+        UiTheme.Ensure();
+        UiTheme.Fill(new Rect(0f, 0f, UiTheme.W, UiTheme.H), new Color32(10, 14, 19, 255));      // backdrop
 
-        scroll = GUILayout.BeginScrollView(scroll);
-        foreach (Entry e in entries)
+        float w = Mathf.Min(UiTheme.W - 48f, 900f);
+        float x = (UiTheme.W - w) * 0.5f;
+
+        // header: title and the count
+        Rect[] head = UiTheme.Cols(new Rect(x, 28f, w, 32f), 0f, 260f);
+        GUI.Label(head[0], "Scenarios", UiTheme.Name);
+        GUI.Label(head[1], entries.Count + " files", UiTheme.Right);
+        UiTheme.Separator(new Rect(x, 64f, w, 1f));
+
+        // the list: every entry is a row with Start, the name and the scene, and a line of description below
+        const float entryH = 66f;
+        var view = new Rect(x, 72f, w, UiTheme.H - 72f - 24f);
+        var content = new Rect(0f, 0f, w - 16f, entries.Count * entryH);
+        scroll = GUI.BeginScrollView(view, scroll, content);
+        for (int i = 0; i < entries.Count; i++)
         {
-            GUILayout.BeginVertical(GUI.skin.box);
-            GUILayout.BeginHorizontal();
+            Entry e = entries[i];
+            float y = i * entryH;
+            Rect[] c = UiTheme.Cols(new Rect(0f, y + 8f, content.width, UiTheme.RowH), 74f, 0f, 240f);
             GUI.enabled = e.canLoad;
-            if (GUILayout.Button("Start", GUILayout.Width(70f), GUILayout.Height(24f)))
+            if (UiTheme.Press(c[0], "Start"))
             {
                 ScenarioContext.Pick = e.name;
                 UnityEngine.Debug.Log("MENU | starting scenario " + e.name + " in scene " + e.scene);
                 SceneManager.LoadScene(e.scene);
             }
             GUI.enabled = true;
-            GUILayout.Label(e.name + (e.scene != null ? "   [" + e.scene + "]" : ""));
-            GUILayout.EndHorizontal();
-            if (!string.IsNullOrEmpty(e.error)) GUILayout.Label(e.error, errorStyle);
-            if (!string.IsNullOrEmpty(e.description))
-                GUILayout.Label(e.description.Length > 260 ? e.description.Substring(0, 257) + "..." : e.description, small);
-            GUILayout.EndVertical();
+            GUI.Label(c[1], e.name, UiTheme.Name);
+            GUI.Label(c[2], e.scene ?? "", UiTheme.Right);
+
+            var line = new Rect(82f, y + 8f + UiTheme.RowH + 4f, content.width - 82f, 28f);
+            if (!string.IsNullOrEmpty(e.error)) GUI.Label(line, e.error, new GUIStyle(UiTheme.Wrap) { normal = { textColor = UiTheme.Red } });
+            else GUI.Label(line, e.description ?? "", UiTheme.Wrap);
+            UiTheme.Separator(new Rect(0f, y + entryH - 1f, content.width, 1f));
         }
-        GUILayout.EndScrollView();
-        GUILayout.EndArea();
+        GUI.EndScrollView();
     }
 }
