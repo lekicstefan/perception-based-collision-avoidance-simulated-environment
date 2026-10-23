@@ -2969,14 +2969,6 @@ GameObject:
   m_Component:
   - component: {fileID: 935829885}
   - component: {fileID: 935829884}
-  - component: {fileID: 935829882}
-  - component: {fileID: 935829886}
-  - component: {fileID: 935829887}
-  - component: {fileID: 935829888}
-  - component: {fileID: 935829889}
-  - component: {fileID: 935829890}
-  - component: {fileID: 935829891}
-  - component: {fileID: 935829892}
   m_Layer: 0
   m_Name: Executor
   m_TagString: Untagged
@@ -2984,27 +2976,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &935829882
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4369e28205172124ca0fc83b02accb98, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ExecutorTestScript
-  executor: {fileID: 935829884}
-  vehicle: {fileID: 1128943756}
-  test: 0
-  startTime: 20
-  capValue: 8
-  comfortDecel: 3
-  brakeRequest: 5
-  validity: 2
-  fallbackDecel: 3
 --- !u!114 &935829884
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3037,115 +3008,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &935829886
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c31fcd18ff6ddf94cb37066a17b4218a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CollisionTestScript
-  vehicle: {fileID: 1128943756}
-  executor: {fileID: 935829884}
-  egoBox: {fileID: 176234558}
-  hazard: {fileID: 0}
-  triggerGap: 15
-  sendEmergency: 1
---- !u!114 &935829887
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 306d38d006906b443bcead36409af9c6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StoppingTableRunner
-  vehicle: {fileID: 1128943756}
-  executor: {fileID: 935829884}
-  speedsKmh:
-  - 20
-  - 30
-  - 40
-  - 50
-  - 60
-  - 70
-  - 80
-  - 90
-  - 100
-  settleTime: 1
-  outputFolder: testing/tools/braking
---- !u!114 &935829888
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b67cfd9c375aad843888f88636df6d03, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SensorConfigTest
-  configName: default
---- !u!114 &935829889
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2cf13a4cbf0493749b176b457429499b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CameraPostProcessingTest
---- !u!114 &935829890
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7fb4f9352c39d0843ba93fb00eba6707, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PoseTest
-  configName: pose_noise
---- !u!114 &935829891
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 567d5bf6bdf00b94a910582816ceb652, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CalibrationTest
-  configName: default
-  vehicle: {fileID: 1128943756}
-  egoBox: {fileID: 176234558}
---- !u!114 &935829892
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 935829881}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f1e6d05832e0c8d44ba18225a23458be, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ProtocolTest
 --- !u!1001 &937264457
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4053,9 +3915,6 @@ GameObject:
   - component: {fileID: 1128943757}
   - component: {fileID: 1128943756}
   - component: {fileID: 1128943761}
-  - component: {fileID: 1128943758}
-  - component: {fileID: 1128943759}
-  - component: {fileID: 1128943760}
   m_Layer: 0
   m_Name: Vehicle
   m_TagString: Untagged
@@ -4107,57 +3966,6 @@ Transform:
   - {fileID: 1541853448}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1128943758
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1128943755}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ffad1a1ccc6185d489449ed57f83ea63, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VehicleTestDriver
-  vehicle: {fileID: 1128943756}
-  speed: 1
-  steeringDeg: 0
-  placeAtRouteStart: 1
-  routeFile: routes/hill_straight.json
-  logInterval: 10
---- !u!114 &1128943759
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1128943755}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 70fbf9ec103866e43b83d46818d3edee, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LongitudinalTestDriver
-  vehicle: {fileID: 1128943756}
-  mode: 0
-  initialSpeed: 20
-  requestedAccel: -8
-  requestTime: 2
-  accelerateDuration: 6
---- !u!114 &1128943760
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1128943755}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 353a651cccad2ec4c954afb409e231cd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SteeringStepTest
-  vehicle: {fileID: 1128943756}
-  stepDeg: 20
-  stepTime: 1
 --- !u!114 &1128943761
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6213,8 +6021,6 @@ GameObject:
   - component: {fileID: 1541853453}
   - component: {fileID: 1541853454}
   - component: {fileID: 1541853458}
-  - component: {fileID: 1541853456}
-  - component: {fileID: 1541853455}
   - component: {fileID: 1541853459}
   - component: {fileID: 1541853461}
   - component: {fileID: 1541853460}
@@ -6359,39 +6165,6 @@ MonoBehaviour:
   cameraSensor: {fileID: 1541853451}
   pose: {fileID: 1541853452}
   reportEvery: 0
---- !u!114 &1541853455
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1541853446}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aecb7c9e9a5b76e478d9f48da014ccda, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CameraRoiCheck
-  cameraSensor: {fileID: 1541853451}
-  roiSize: 48
-  roiCentreX: 320
-  roiCentreY: 120
-  everyNFrames: 5
-  reportEvery: 12
---- !u!114 &1541853456
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1541853446}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1953c524e2f1bac43a7080d858c16382, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LidarWallCheck
-  lidar: {fileID: 1541853450}
-  wall: {fileID: 0}
-  reportEveryScans: 100
 --- !u!114 &1541853458
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6899,7 +6672,6 @@ MonoBehaviour:
   network: {fileID: 0}
   cameraRoot: {fileID: 0}
   startCamera: 0
-  startDots: 1
   startBeams: 0
   startLidarView: 0
   startCameraView: 1

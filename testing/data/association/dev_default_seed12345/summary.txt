@@ -1,7 +1,0 @@
-recording dev_default_seed12345, point centre, 211 scans, confirm 3, max misses 5
-
- gate_chi2  measurements  correct  switches  fragments  duplicates  born  confirmed  merged  coverage  d2_mean  d2_p95
-      5.99           640      576         8         19          27    56         26       1      0.85     0.50    2.52
-      9.21           640      583         7         19          21    50         24       1      0.87     0.63    3.05
-     13.80           640      586         8         17          19    46         21       1      0.89     0.86    4.49
-     20.00           640      595         6         17          12    39         19       1      0.91     1.15    6.58
