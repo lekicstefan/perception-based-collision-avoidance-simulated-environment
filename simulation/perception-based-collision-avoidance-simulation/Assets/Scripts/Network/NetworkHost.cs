@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
@@ -7,14 +8,6 @@ using UnityEngine;
 using Newtonsoft.Json.Linq;
 using Stopwatch = System.Diagnostics.Stopwatch;
 
-// Unity side of docs/protocol.md: sockets, handshake, heartbeat and shutdown.
-//
-// Threads: the main thread serializes sensor events into byte arrays (Protocol.Build*) and puts them in a queue.
-// One background thread owns every NetMQ socket: it sends from the queue, receives commands, runs the handshake and
-// sends the calibration heartbeat. Unity API calls stay on the main thread, sockets stay on the network thread.
-//
-// Run start: while waitForProcessor is on, Time.timeScale is 0 from Awake until the processor answers READY, so no
-// FixedUpdate runs (no sensors, no driving, no logging). Then timeScale becomes 1 and the run starts with seq 0.
 public class NetworkHost : MonoBehaviour
 {
     [Header("Scene wiring")]
@@ -30,14 +23,15 @@ public class NetworkHost : MonoBehaviour
     public bool waitForProcessor = true;
 
     // socket indices
-    const int SSession = 0, SLidar = 1, SCamera = 2, SPose = 3, SOracle = 4;
-    static readonly int[] Hwm = { 1000, 5, 10, 100, 5 };                       // docs/protocol.md section 1
-    static readonly int[] Ports = { Protocol.PortSession, Protocol.PortLidar, Protocol.PortCamera, Protocol.PortPose, Protocol.PortOracle };
-    static readonly string[] Names = { "session", "lidar", "camera", "pose", "oracle" };
+    const int SSession = 0, SBundle = 1, SOracle = 2;
+    static readonly int[] Hwm = { 1000, 3, 5 };
+    static readonly int[] Ports = { Protocol.PortSession, Protocol.PortBundle, Protocol.PortOracle };
+    static readonly string[] Names = { "session", "bundle", "oracle" };
     const int SocketBufferBytes = 64 * 1024;    // bounds how stale queued data can get (see the stall experiment)
     const int MaxQueued = 500;                  // safety net, the network thread normally keeps the queue near empty
 
-    struct Outgoing { public int socket; public byte[] data; }
+    struct Outgoing { public int socket; public byte[] data; public int frame; }   // frame = -1 for everything but bundles
+    struct Pending { public LidarScan scan; public CameraFrame frame; public long lidarReady, cameraReady; }
 
     readonly BlockingCollection<Outgoing> outgoing = new BlockingCollection<Outgoing>();
     Thread thread;
@@ -52,8 +46,12 @@ public class NetworkHost : MonoBehaviour
     CommandExecutor executorRef;                // read on the network thread, compared with ReferenceEquals (no Unity calls)
 
     bool started, failureReported;
-    uint lidarSeq, cameraSeq, poseSeq, oracleSeq;   // main thread only
-    readonly long[] sentCount = new long[5];        // network thread writes, read after Join
+    uint oracleSeq;                                 // main thread only
+    readonly Dictionary<int, Pending> pending = new Dictionary<int, Pending>();   // main thread only
+    bool needLidar, needCamera;
+    int incompleteFrames;
+    string latencyPath;
+    readonly long[] sentCount = new long[3];        // network thread writes, read after Join
     int commandsReceived, parseErrors, queueDrops;
 
     public bool Started { get { return started; } }
@@ -83,7 +81,6 @@ public class NetworkHost : MonoBehaviour
         if (!waitForProcessor) return;
         if (lidar != null) lidar.ScanReady += OnScan;
         if (cameraSensor != null) cameraSensor.FrameReady += OnFrame;
-        if (pose != null) pose.PoseReady += OnPose;
         if (oracle != null && oracle.oracleMode) oracle.OracleReady += OnOracle;
     }
 
@@ -91,7 +88,6 @@ public class NetworkHost : MonoBehaviour
     {
         if (lidar != null) lidar.ScanReady -= OnScan;
         if (cameraSensor != null) cameraSensor.FrameReady -= OnFrame;
-        if (pose != null) pose.PoseReady -= OnPose;
         if (oracle != null) oracle.OracleReady -= OnOracle;
     }
 
@@ -100,6 +96,9 @@ public class NetworkHost : MonoBehaviour
         if (!waitForProcessor) return;
         if (calibration == null) UnityEngine.Debug.LogWarning("NetworkHost: no CalibrationProvider assigned, the processor will never get a calibration.");
         executorRef = executor;
+        needLidar = lidar != null && lidar.rig.Config.lidar.enabled;
+        needCamera = cameraSensor != null && cameraSensor.rig.Config.camera.enabled;
+        Latency.Reset();
         bool oracleMode = oracle != null && oracle.oracleMode;
         threadAlive = true;
         thread = new Thread(() => NetLoop(oracleMode)) { IsBackground = true, Name = "NetworkHost" };
@@ -122,6 +121,7 @@ public class NetworkHost : MonoBehaviour
             string path = null;
             if (!string.IsNullOrEmpty(readyJson)) path = (string)JObject.Parse(readyJson)["run_dir"];
             RunFolder.Configure(path);
+            if (RunFolder.Current == RunFolder.State.Enabled) latencyPath = System.IO.Path.Combine(RunFolder.UnityDir, "latency.csv");
 
             started = true;
             Time.timeScale = 1f;
@@ -131,31 +131,79 @@ public class NetworkHost : MonoBehaviour
 
     // ------------------------------------------------------------------ main thread: sensor events to the queue
 
-    void OnScan(LidarScan s) { if (started) Enqueue(SLidar, Protocol.BuildLidar(lidarSeq++, s)); }
-    void OnFrame(CameraFrame f) { if (started) Enqueue(SCamera, Protocol.BuildCamera(cameraSeq++, f)); }
-    void OnPose(PoseState p) { if (started) Enqueue(SPose, Protocol.BuildPose(poseSeq++, p)); }
-    void OnOracle(OracleFrame o) { if (started) Enqueue(SOracle, Protocol.BuildOracle(oracleSeq++, o)); }
+    // Lidar, camera and pose belong to one frame. The lidar scan and the pose are ready at the capture step; the camera
+    // frame arrives later (readback and JPEG encoding), and the bundle leaves when the last part is there.
+    void OnScan(LidarScan s)
+    {
+        if (!started) return;
+        Pending p;
+        pending.TryGetValue(s.frameId, out p);
+        p.scan = s;
+        p.lidarReady = Latency.Ns();
+        Offer(s.frameId, p);
+    }
 
-    void Enqueue(int socket, byte[] data)
+    void OnFrame(CameraFrame f)
+    {
+        if (!started) return;
+        Pending p;
+        pending.TryGetValue(f.frameId, out p);
+        p.frame = f;
+        p.cameraReady = Latency.Ns();
+        Offer(f.frameId, p);
+    }
+
+    void Offer(int id, Pending p)
+    {
+        if ((needLidar && p.scan == null) || (needCamera && p.frame == null))
+        {
+            pending[id] = p;
+            return;
+        }
+        pending.Remove(id);
+        long captureTicks = p.scan != null ? p.scan.captureTicks : p.frame.captureTicks;
+        if (p.scan != null && p.frame != null) captureTicks = System.Math.Min(p.scan.captureTicks, p.frame.captureTicks);
+        long captureNs = Latency.TicksToNs(captureTicks);
+        long ready = System.Math.Max(p.lidarReady, p.cameraReady);
+        byte[] msg = Protocol.BuildBundle(id, p.scan, p.frame, captureNs);
+        long built = Latency.Ns();
+        Protocol.Stamp(msg, Protocol.BundleBuiltOffset, built);
+        Latency.Frame((uint)id, p.scan != null ? p.scan.timestamp : p.frame.timestamp, captureNs, p.lidarReady, p.cameraReady, built, msg.Length);
+        Enqueue(SBundle, msg, id);
+
+        // a part that never arrives (camera readback error, encoder queue full) must not keep a frame forever
+        List<int> stale = null;
+        foreach (int k in pending.Keys) if (k < id - 3) (stale ?? (stale = new List<int>())).Add(k);
+        if (stale != null)
+            foreach (int k in stale)
+            {
+                pending.Remove(k);
+                if (++incompleteFrames == 1) UnityEngine.Debug.LogWarning("NetworkHost: a frame never became complete (lidar or camera part missing) and was dropped");
+            }
+    }
+
+    void OnOracle(OracleFrame o) { if (started) Enqueue(SOracle, Protocol.BuildOracle(oracleSeq++, o), -1); }
+
+    void Enqueue(int socket, byte[] data, int frame)
     {
         if (outgoing.Count >= MaxQueued)
         {
             if (Interlocked.Increment(ref queueDrops) == 1) UnityEngine.Debug.LogWarning("NetworkHost: send queue is full, dropping messages");
             return;
         }
-        outgoing.Add(new Outgoing { socket = socket, data = data });
+        outgoing.Add(new Outgoing { socket = socket, data = data, frame = frame });
     }
 
     // ------------------------------------------------------------------ network thread
 
     void NetLoop(bool oracleMode)
     {
-        var pubs = new PublisherSocket[5];
+        var pubs = new PublisherSocket[3];
         SubscriberSocket cmd = null;
         try
         {
             AsyncIO.ForceDotNet.Force();       // needed for NetMQ under Mono in the player (found in phase 1)
-            int n = oracleMode ? 5 : 4;        // the oracle socket does not exist in normal mode
+            int n = oracleMode ? 3 : 2;        // the oracle socket does not exist in normal mode
             for (int i = 0; i < n; i++) pubs[i] = BindPublisher(i);
             cmd = new SubscriberSocket();
             cmd.Options.ReceiveHighWatermark = 10;
@@ -213,7 +261,7 @@ public class NetworkHost : MonoBehaviour
         {
             // 1. commands from the processor
             byte[] raw;
-            while (cmd.TryReceiveFrameBytes(TimeSpan.Zero, out raw)) HandleCommandMessage(raw);
+            while (cmd.TryReceiveFrameBytes(TimeSpan.Zero, out raw)) HandleCommandMessage(raw, Latency.Ns());
 
             long now = clock.ElapsedMilliseconds;
 
@@ -242,7 +290,14 @@ public class NetworkHost : MonoBehaviour
             Outgoing o;
             while (sent < 64 && outgoing.TryTake(out o, 0))
             {
+                long sentNs = 0;
+                if (o.frame >= 0)
+                {
+                    sentNs = Latency.Ns();
+                    Protocol.Stamp(o.data, Protocol.BundleSentOffset, sentNs);
+                }
                 pubs[o.socket].SendFrame(o.data);
+                if (o.frame >= 0) Latency.Sent((uint)o.frame, sentNs);
                 sentCount[o.socket]++;
                 sent++;
             }
@@ -264,7 +319,7 @@ public class NetworkHost : MonoBehaviour
         }
     }
 
-    void HandleCommandMessage(byte[] raw)
+    void HandleCommandMessage(byte[] raw, long receivedNs)
     {
         Protocol.CmdType type;
         VehicleCommand c;
@@ -282,6 +337,7 @@ public class NetworkHost : MonoBehaviour
                 break;
             case Protocol.CmdType.Command:
                 Interlocked.Increment(ref commandsReceived);
+                Latency.CommandReceived(c.id, receivedNs);
                 if (!ReferenceEquals(executorRef, null)) executorRef.Submit(c);   // Submit is safe from any thread
                 break;
             case Protocol.CmdType.Telemetry:
@@ -300,9 +356,10 @@ public class NetworkHost : MonoBehaviour
         threadAlive = false;
         thread.Join(1000);
         NetMQConfig.Cleanup(false);
+        if (latencyPath != null) Latency.Write(latencyPath);
 
         string s = "NetworkHost: closed. sent";
-        for (int i = 0; i < 5; i++) if (sentCount[i] > 0) s += " " + Names[i] + " " + sentCount[i];
-        UnityEngine.Debug.Log(s + " | commands received " + commandsReceived + ", bad command messages " + parseErrors + ", queue drops " + queueDrops);
+        for (int i = 0; i < 3; i++) if (sentCount[i] > 0) s += " " + Names[i] + " " + sentCount[i];
+        UnityEngine.Debug.Log(s + " | commands received " + commandsReceived + ", bad command messages " + parseErrors + ", queue drops " + queueDrops + ", incomplete frames " + incompleteFrames);
     }
 }

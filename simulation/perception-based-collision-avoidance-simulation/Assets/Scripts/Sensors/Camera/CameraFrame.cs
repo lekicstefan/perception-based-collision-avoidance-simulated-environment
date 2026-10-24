@@ -1,5 +1,6 @@
 public class CameraFrame
 {
+    public long captureTicks;  // Stopwatch.GetTimestamp() just before the render (latency measurement)
     public double timestamp;   // simulation time of the capture step (s)
     public int frameId;
     public int width, height;

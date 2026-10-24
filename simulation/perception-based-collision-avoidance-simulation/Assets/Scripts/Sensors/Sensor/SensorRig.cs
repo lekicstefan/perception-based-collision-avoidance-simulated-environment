@@ -26,12 +26,10 @@ public class SensorRig : MonoBehaviour
 
         float dt = Time.fixedDeltaTime;
         string note = "";
-        CheckRate("camera", Config.camera.rateHz, dt, ref note);
-        CheckRate("lidar", Config.lidar.rateHz, dt, ref note);
-        CheckRate("pose", Config.pose.rateHz, dt, ref note);
+        CheckRate("frame", Config.frameRateHz, dt, ref note);
         UnityEngine.Debug.Log("SENSOR RIG '" + cfgName + "' | seed " + Seed + " | camera " + Config.camera.width + "x" +
-            Config.camera.height + " @ " + Config.camera.rateHz.ToString("F0") + " Hz | lidar " + Config.lidar.Rows + " x " +
-            Config.lidar.Columns + " @ " + Config.lidar.rateHz.ToString("F0") + " Hz | pose @ " + Config.pose.rateHz.ToString("F0") + " Hz" + note);
+            Config.camera.height + " | lidar " + Config.lidar.Rows + " x " +
+            Config.lidar.Columns + " | frame rate " + Config.frameRateHz.ToString("F0") + " Hz" + note);
     }
 
     static void CheckRate(string label, float rateHz, float dt, ref string note)

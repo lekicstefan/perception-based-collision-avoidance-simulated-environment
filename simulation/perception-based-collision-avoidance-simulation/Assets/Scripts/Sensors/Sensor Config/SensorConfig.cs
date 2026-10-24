@@ -3,11 +3,6 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
 
-// Sensor configuration. Mount poses use the processor convention (right-handed), relative to the
-// Vehicle root (rear axle centre at ground level): x forward, y left, z up (meters);
-// yawDeg positive to the left, pitchDeg positive up, rollDeg by the right-hand rule about the forward axis.
-// Partial JSON files are fine: every field that is missing keeps the default set in this file.
-
 public class Mount
 {
     public float x, y, z;
@@ -51,7 +46,6 @@ public class CameraConfig
     public bool enabled = true;
     public int width = 640;
     public int height = 360;
-    public float rateHz = 30f;
     public float horizontalFovDeg = 90f;
     public Mount mount = new Mount { x = 1.8f, y = 0f, z = 1.3f };
     public string format = "jpeg";       // "jpeg" or "raw"
@@ -85,7 +79,6 @@ public class LidarConfig
     public float horizontalFovDeg = 120f;
     public float horizontalResolutionDeg = 0.2f;
     public float maxRangeM = 100f;
-    public float rateHz = 10f;
     public float rangeNoiseStdM = 0.02f;
     public float dropoutProbability = 0.01f;
     public bool grazingDropoutEnabled = false;
@@ -117,7 +110,6 @@ public class LidarConfig
 
 public class PoseConfig
 {
-    public float rateHz = 50f;                     // standalone state message rate
     public bool noiseEnabled = false;
     public float positionNoiseStdM = 0.05f;        // white noise per message
     public float yawNoiseStdDeg = 0.1f;
@@ -130,6 +122,7 @@ public class SensorConfig
     public int schema = 1;
     public string name = "default";
     public int seed = 12345;
+    public float frameRateHz = 10f;   // lidar, camera and pose are captured together at this rate and travel as one bundle
     public CameraConfig camera = new CameraConfig();
     public LidarConfig lidar = new LidarConfig();
     public PoseConfig pose = new PoseConfig();
@@ -146,7 +139,7 @@ public class SensorConfig
         LidarConfig l = lidar;
         PoseConfig p = pose;
         Require(c.width > 0 && c.height > 0, "camera.width and camera.height must be > 0");
-        Require(c.rateHz > 0f, "camera.rateHz must be > 0");
+        Require(frameRateHz > 0f, "frameRateHz must be > 0");
         Require(c.horizontalFovDeg > 10f && c.horizontalFovDeg < 170f, "camera.horizontalFovDeg must be between 10 and 170");
         Require(c.format == "jpeg" || c.format == "raw", "camera.format must be \"jpeg\" or \"raw\"");
         Require(c.jpegQuality >= 1 && c.jpegQuality <= 100, "camera.jpegQuality must be 1..100");
@@ -155,10 +148,10 @@ public class SensorConfig
         Require(l.Rows >= 1, "lidar needs at least one beam");
         foreach (float e in l.ElevationsDeg) Require(e > -90f && e < 90f, "lidar elevations must be between -90 and 90 degrees");
         Require(l.horizontalResolutionDeg > 0f && l.horizontalFovDeg > 0f && l.horizontalFovDeg <= 360f, "lidar horizontal fov/resolution out of range");
-        Require(l.maxRangeM > 0f && l.rateHz > 0f, "lidar.maxRangeM and lidar.rateHz must be > 0");
+        Require(l.maxRangeM > 0f, "lidar.maxRangeM must be > 0");
         Require(l.dropoutProbability >= 0f && l.dropoutProbability <= 1f, "lidar.dropoutProbability must be 0..1");
         Require(l.rangeNoiseStdM >= 0f && l.fogSensitivity >= 0f, "lidar noise/fog values must be >= 0");
         Require(l.grazingStartDeg < l.grazingEndDeg, "lidar.grazingStartDeg must be below grazingEndDeg");
-        Require(p.rateHz > 0f && p.positionNoiseStdM >= 0f && p.yawNoiseStdDeg >= 0f, "pose values out of range");
+        Require(p.positionNoiseStdM >= 0f && p.yawNoiseStdDeg >= 0f, "pose values out of range");
     }
 }

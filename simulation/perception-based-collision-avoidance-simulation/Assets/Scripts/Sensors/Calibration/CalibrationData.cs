@@ -1,7 +1,3 @@
-// Calibration for the processor. Processor convention throughout: x forward, y left, z up;
-// vehicle frame origin = centre of the rear axle at ground level. Mount angles in degrees.
-// It deliberately contains nothing about noise, dropout, fog or seeds: those are simulator internals.
-
 public class EgoCalibration
 {
     public float wheelbase;
@@ -19,7 +15,6 @@ public class OpticalTransform
 public class CameraCalibration
 {
     public int width, height;
-    public float rateHz;
     public string format;
     public float fx, fy, cx, cy;                 // pixels; pixel (0,0) is the top-left corner, pixel i covers [i, i+1)
     public float horizontalFovDeg, verticalFovDeg;
@@ -31,7 +26,7 @@ public class CameraCalibration
 public class LidarCalibration
 {
     public int rows, cols;
-    public float rateHz, maxRangeM;
+    public float maxRangeM;
     public Mount mount;
     public float[] elevationsDeg;                // row 0 = highest beam
     public float[] azimuthsDeg;                  // column 0 = leftmost, positive to the left
@@ -49,5 +44,5 @@ public class CalibrationData
     public EgoCalibration ego;
     public CameraCalibration camera;
     public LidarCalibration lidar;
-    public float poseRateHz;
+    public float frameRateHz;
 }

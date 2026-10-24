@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using UnityEngine;
 
-// Mechanical command executor. The processor decides; this only enforces.
-// The system can only brake: the final acceleration is never above the driver's.
 [DefaultExecutionOrder(5)] // after Vehicle (-100) and RouteDriver (0)
 public class CommandExecutor : MonoBehaviour
 {
@@ -13,7 +11,7 @@ public class CommandExecutor : MonoBehaviour
     public RouteDriver driver;
     public float capGain = 1f;          // 1/s, P gain when following a cap
     public bool enforceExpiry = true;   // off = ablation "expiring commands off"
-    public bool logCommands = true;     // turn off when commands arrive at 30 Hz
+    public bool logCommands = false;    // one log line per command; off, commands arrive every frame
 
     public CommandStatus Status { get; private set; }
     public Rule AppliedRule { get; private set; }
@@ -50,6 +48,7 @@ public class CommandExecutor : MonoBehaviour
             Status = CommandStatus.Active;
             AppliedAt = now;
             LastId = latest.id;
+            Latency.CommandApplied(latest.id, Latency.Ns());
             if (logCommands)
                 UnityEngine.Debug.Log("COMMAND #" + latest.id + " applied | comfort cap " + latest.comfortCap.ToString("F1") +
                     " | safety cap " + latest.safetyCap.ToString("F1") + " | comfort decel " + latest.comfortDecel.ToString("F1") +

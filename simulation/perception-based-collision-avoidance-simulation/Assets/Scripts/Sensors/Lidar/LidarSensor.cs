@@ -67,7 +67,7 @@ public class LidarSensor : MonoBehaviour
         results = new NativeArray<RaycastHit>(n, Allocator.Persistent);
         query = new QueryParameters(~excludeLayers.value, false, QueryTriggerInteraction.Ignore, false);
         rng = new System.Random(rig.DerivedSeed("lidar"));
-        schedule = new SensorSchedule(cfg.rateHz);
+        schedule = new SensorSchedule(rig.Config.frameRateHz);
         debugClass = new byte[n];
         GroundTruthHitIds = new int[n];
         GroundTruthHitRanges = new float[n];
@@ -83,6 +83,7 @@ public class LidarSensor : MonoBehaviour
         double now = SimClock.Now;
         if (!schedule.Due(now, Time.fixedDeltaTime)) return;
 
+        long captureTicks = System.Diagnostics.Stopwatch.GetTimestamp();
         var sw = System.Diagnostics.Stopwatch.StartNew();
         Physics.SyncTransforms(); // objects moved by scripts in this step must be current
 
@@ -97,6 +98,7 @@ public class LidarSensor : MonoBehaviour
 
         var scan = new LidarScan
         {
+            captureTicks = captureTicks,
             timestamp = now,
             frameId = frameId++,
             rows = rows,

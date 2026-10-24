@@ -63,7 +63,7 @@ public class CameraSensor : MonoBehaviour
         rt.Create();
         cam.targetTexture = rt;
 
-        schedule = new SensorSchedule(cfg.rateHz);
+        schedule = new SensorSchedule(rig.Config.frameRateHz);
         camSeed = rig.DerivedSeed("camera");
 
         readbackTopDown = readbackOrder == ReadbackOrder.Auto ? DetectReadbackTopDown()
@@ -151,9 +151,9 @@ public class CameraSensor : MonoBehaviour
         if (!schedule.Due(now, Time.fixedDeltaTime)) return;
 
         ApplyFog();
+        long wall = System.Diagnostics.Stopwatch.GetTimestamp();
         cam.Render();
         int id = frameId++;
-        long wall = System.Diagnostics.Stopwatch.GetTimestamp();
         PoseState p = poseEstimator != null ? poseEstimator.Current : default(PoseState);
         AsyncGPUReadback.Request(rt, 0, TextureFormat.RGBA32, req => OnReadback(req, id, now, wall, p));
     }
@@ -217,7 +217,7 @@ public class CameraSensor : MonoBehaviour
             data = ImageConversion.EncodeArrayToJPG(enc, GraphicsFormat.R8G8B8_SRGB, (uint)w, (uint)h, 0, cfg.jpegQuality);
         }
         float ms = (float)((System.Diagnostics.Stopwatch.GetTimestamp() - job.wallStart) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
-        return new CameraFrame { timestamp = job.timestamp, frameId = job.frameId, width = w, height = h, format = cfg.format, data = data, latencyMs = ms, pose = job.pose };
+        return new CameraFrame { captureTicks = job.wallStart, timestamp = job.timestamp, frameId = job.frameId, width = w, height = h, format = cfg.format, data = data, latencyMs = ms, pose = job.pose };
     }
 
     // ---- main thread ----

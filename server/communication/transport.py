@@ -7,17 +7,10 @@ import zmq
 
 from server.communication import protocol as P
 
-SOCKET_BUFFER_BYTES = 64 * 1024     # kernel buffers on the sensor sockets, bounds how stale queued data can get
-HWM = {"session": 1000, "lidar": 5, "camera": 10, "pose": 100, "oracle": 5}
+SOCKET_BUFFER_BYTES = 64 * 1024     # kernel buffers on the bundle socket, bounds how stale queued data can get
+HWM = {"session": 1000, "bundle": 3, "oracle": 5}
 COMMAND_HWM = 10
-DATA_STREAMS = ("lidar", "camera", "pose", "oracle")
-EXPECTED = {
-    "session": P.SESSION_TYPES,
-    "lidar": (P.MsgType.LIDAR,),
-    "camera": (P.MsgType.CAMERA,),
-    "pose": (P.MsgType.POSE,),
-    "oracle": (P.MsgType.ORACLE,),
-}
+EXPECTED = {"session": P.SESSION_TYPES, "bundle": (P.MsgType.BUNDLE,), "oracle": (P.MsgType.ORACLE,)}
 
 
 class LinkTimeout(RuntimeError):
@@ -33,12 +26,10 @@ class StreamStats:
     lost: int = 0
     out_of_order: int = 0
     gaps: list = field(default_factory=list)      # (first_lost_seq, last_lost_seq)
-    first_t: float | None = None
-    last_t: float | None = None
 
-    def update(self, seq: int, t: float) -> None:
+    def update(self, seq: int) -> None:
         if self.first_seq is None:
-            self.first_seq, self.first_t = seq, t
+            self.first_seq = seq
             if seq != 0:                           # slow joiner: the first messages never arrived
                 self.lost += seq
                 self.gaps.append((0, seq - 1))
@@ -52,31 +43,26 @@ class StreamStats:
         else:
             self.out_of_order += 1
         self.received += 1
-        self.last_t = t
 
 
 @dataclass(frozen=True)
 class Incoming:
+    recv_ns: int
     header: P.Header
     raw: bytes
 
 
 class Link:
-    def __init__(self, oracle: bool = False, host: str = "127.0.0.1", ports: dict | None = None,
-                 heartbeat_timeout: float = 5.0):
-        self.ports = {"session": P.PORT_SESSION, "command": P.PORT_COMMAND, "lidar": P.PORT_LIDAR,
-                      "camera": P.PORT_CAMERA, "pose": P.PORT_POSE, "oracle": P.PORT_ORACLE}
-        if ports:
-            self.ports.update(ports)
+    def __init__(self, oracle: bool = False, host: str = "127.0.0.1", heartbeat_timeout: float = 5.0):
         self.heartbeat_timeout = heartbeat_timeout
         self.ctx = zmq.Context()
-
         self.cmd = self.ctx.socket(zmq.PUB)
         self.cmd.setsockopt(zmq.SNDHWM, COMMAND_HWM)
         self.cmd.setsockopt(zmq.LINGER, 200)
-        self._bind_with_retry(self.cmd, f"tcp://{host}:{self.ports['command']}")
+        self._bind_with_retry(self.cmd, f"tcp://{host}:{P.PORT_COMMAND}")
 
-        names = ["session", "lidar", "camera", "pose"] + (["oracle"] if oracle else [])   # no oracle socket in normal mode
+        ports = {"session": P.PORT_SESSION, "bundle": P.PORT_BUNDLE, "oracle": P.PORT_ORACLE}
+        names = ["session", "bundle"] + (["oracle"] if oracle else [])
         self.subs: dict[str, zmq.Socket] = {}
         self.poller = zmq.Poller()
         for name in names:
@@ -86,7 +72,7 @@ class Link:
                 s.setsockopt(zmq.RCVBUF, SOCKET_BUFFER_BYTES)
             s.setsockopt(zmq.LINGER, 0)
             s.setsockopt(zmq.SUBSCRIBE, b"")
-            s.connect(f"tcp://{host}:{self.ports[name]}")
+            s.connect(f"tcp://{host}:{ports[name]}")
             self.subs[name] = s
             self.poller.register(s, zmq.POLLIN)
 
@@ -98,15 +84,13 @@ class Link:
         self.end_sim_time: float | None = None
         self.errors: list[str] = []
         self.error_count = 0
-        self.ignored_before_hello = 0        # leftovers of an earlier Unity run (run_processor --loop), see _receive
+        self.ignored_before_hello = 0        # leftovers of an earlier Unity run, see _receive
         self._pending: list[Incoming] = []
         self._last_session = time.monotonic()
-        self.recorder = None                 # StreamRecorder, see attach_recorder()
-        self._rec_buffer: list | None = None # (arrival time, raw) kept during the handshake, before the run folder is known
 
     @staticmethod
     def _bind_with_retry(sock, address: str, timeout: float = 10.0) -> None:
-        """After a run the previous Link may still be closing its socket (run_processor --loop): a busy port is retried for a while."""
+        """The previous run may still be closing its socket (--loop): a busy port is retried for a while."""
         t0 = time.monotonic()
         while True:
             try:
@@ -116,8 +100,6 @@ class Link:
                 if e.errno != zmq.EADDRINUSE or time.monotonic() - t0 > timeout:
                     raise
                 time.sleep(0.2)
-
-    # ------------------------------------------------------------------ receiving
 
     def _error(self, where: str, e: Exception) -> None:
         self.error_count += 1
@@ -134,13 +116,11 @@ class Link:
             cid = data.get("calibrationId")
             if self.calibration is None:
                 self.calibration, self.calibration_id = data, cid
-                self._record(raw)
             elif cid != self.calibration_id:
                 raise P.ProtocolError(f"calibration id changed during the run ({self.calibration_id} -> {cid})")
         elif h.type == P.MsgType.END_OF_RUN and not self.ended:   # Unity sends several copies
             self.ended = True
             self.end_sim_time = data.get("sim_time")
-            self._record(raw)
 
     def _receive(self, timeout_ms: int) -> list[Incoming]:
         out: list[Incoming] = []
@@ -153,14 +133,14 @@ class Link:
                     raw = sock.recv(zmq.NOBLOCK)
                 except zmq.Again:
                     break
+                recv_ns = time.perf_counter_ns()
                 try:
                     h = P.parse_header(raw)
                     if h.type not in EXPECTED[name]:
                         raise P.ProtocolError(f"{h.type.name} message on the {name} socket")
                     if self.hello is None and not (name == "session" and h.type == P.MsgType.HELLO):
-                        # A run always begins with HELLO, and no data flows before READY. Anything that arrives earlier belongs to a
-                        # Unity run that is already over or still going (the stale END_OF_RUN copies of the run before, or the
-                        # stream of a run that another processor run answered): it must not end or feed this run.
+                        # A run always begins with HELLO and no data flows before READY: anything earlier belongs to a
+                        # Unity run that is already over (stale END_OF_RUN copies) and must not end or feed this run.
                         self.ignored_before_hello += 1
                         continue
                     if name == "session":
@@ -168,51 +148,29 @@ class Link:
                         continue
                 except P.ProtocolError as e:
                     if "calibration id changed" in str(e):
-                        raise                       # a changed calibration invalidates the run
+                        raise
                     self._error(name, e)
                     continue
-                self.stats[name].update(h.seq, h.t)
-                self._record(raw)
-                out.append(Incoming(h, raw))
+                self.stats[name].update(h.seq)
+                out.append(Incoming(recv_ns, h, raw))
         return out
 
-    def _record(self, raw: bytes) -> None:
-        if self.recorder is not None:
-            self.recorder.write(raw)
-        elif self._rec_buffer is not None:
-            self._rec_buffer.append((time.monotonic(), raw))
-
-    def attach_recorder(self, recorder) -> None:
-        """Start recording. Messages that arrived during the handshake (buffer_for_recording=True) are written first."""
-        for arrival, raw in self._rec_buffer or []:
-            recorder.write(raw, arrival)
-        self._rec_buffer = None
-        self.recorder = recorder
-
-    def stop_buffering(self) -> None:
-        self._rec_buffer = None
-
-    def drain(self, timeout_ms: int = 0) -> list[Incoming]:
-        """Everything that arrived since the last call (sensor messages only), in arrival order per stream."""
+    def receive(self, timeout_ms: int = 0) -> list[Incoming]:
+        """Waits up to timeout_ms for something, returns every bundle (and oracle message) that has arrived, in arrival order."""
         msgs = self._pending + self._receive(timeout_ms)
         self._pending = []
         return msgs
 
     def check_alive(self) -> None:
-        """Call once per cycle. Unity resends CALIBRATION every second (also while paused) as a heartbeat."""
+        """Unity resends CALIBRATION every second (also while paused) as a heartbeat."""
         if not self.ended and time.monotonic() - self._last_session > self.heartbeat_timeout:
             raise LinkTimeout(f"no session message from Unity for {self.heartbeat_timeout:.1f} s")
 
-    # ------------------------------------------------------------------ handshake and sending
-
     def handshake(self, warmup=None, timeout: float = 120.0, settle: float = 0.3, ready_period: float = 0.1,
-                  data_timeout: float = 10.0, buffer_for_recording: bool = False, run_dir: str | None = None) -> None:
-        """Warm up, wait for HELLO, settle, then send READY until the first POSE message arrives.
-        buffer_for_recording: keep what arrives during the handshake so attach_recorder() can write it afterwards."""
-        if buffer_for_recording:
-            self._rec_buffer = []
+                  data_timeout: float = 10.0, run_dir: str | None = None) -> None:
+        """Warm up, wait for HELLO, settle, then send READY until the first bundle arrives."""
         if warmup is not None:
-            warmup()                                # Numba compilation etc. before Unity is told to start
+            warmup()
         t0 = time.monotonic()
         while self.hello is None:
             self._pending += self._receive(100)
@@ -223,7 +181,7 @@ class Link:
         self._pending += self._receive(int(settle * 1000))
         t_ready = time.monotonic()
         next_ready = 0.0
-        while self.stats["pose"].received == 0:
+        while self.stats["bundle"].received == 0:
             now = time.monotonic()
             if now >= next_ready:
                 self.cmd.send(P.build_ready(run_dir))
@@ -233,16 +191,11 @@ class Link:
                 raise LinkTimeout("READY sent but no data arrived from Unity")
         self._last_session = time.monotonic()
 
-    def send_raw(self, raw: bytes) -> None:
-        self.cmd.send(raw)
-
     def send_command(self, command: P.Command) -> None:
         self.cmd.send(P.build_command(command))
 
     def send_telemetry(self, obj: dict) -> None:
         self.cmd.send(P.build_telemetry(obj))
-
-    # ------------------------------------------------------------------ reporting and shutdown
 
     def summary(self) -> str:
         lines = []
@@ -257,6 +210,5 @@ class Link:
         return "\n".join(lines)
 
     def close(self) -> None:
-        """Safe to call more than once. destroy() closes every socket, so terminating the context cannot hang."""
         if not self.ctx.closed:
             self.ctx.destroy(linger=200)

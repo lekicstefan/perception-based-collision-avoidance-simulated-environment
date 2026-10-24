@@ -79,7 +79,6 @@ public static class CalibrationBuilder
         {
             width = cam.width,
             height = cam.height,
-            rateHz = cam.rateHz,
             format = cam.format,
             fx = cam.FocalPx,
             fy = cam.FocalPx,
@@ -98,13 +97,12 @@ public static class CalibrationBuilder
         {
             rows = l.Rows,
             cols = l.Columns,
-            rateHz = l.rateHz,
             maxRangeM = l.maxRangeM,
             mount = l.mount,
             elevationsDeg = (float[])l.ElevationsDeg.Clone(),
             azimuthsDeg = az
         };
-        c.poseRateHz = cfg.pose.rateHz;
+        c.frameRateHz = cfg.frameRateHz;
 
         c.calibrationId = "";
         c.calibrationId = Fnv(ToJson(c, false)).ToString("X8");

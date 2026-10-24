@@ -61,7 +61,6 @@ class EgoCalibration:
 class CameraCalibration:
     width: int
     height: int
-    rate_hz: float
     format: str
     fx: float
     fy: float
@@ -87,7 +86,6 @@ class CameraCalibration:
 class LidarCalibration:
     rows: int
     cols: int
-    rate_hz: float
     max_range_m: float
     mount: Mount
     elevations_deg: np.ndarray    # (rows,), row 0 = highest beam
@@ -106,7 +104,7 @@ class Calibration:
     ego: EgoCalibration
     camera: CameraCalibration
     lidar: LidarCalibration
-    pose_rate_hz: float
+    frame_rate_hz: float
 
     @classmethod
     def from_dict(cls, d: dict) -> "Calibration":
@@ -115,14 +113,14 @@ class Calibration:
             calibration_id=d["calibrationId"],
             ego=EgoCalibration(e["wheelbase"], e["length"], e["width"], e["height"], e["rearOverhang"], e["frontOverhang"]),
             camera=CameraCalibration(
-                c["width"], c["height"], c["rateHz"], c["format"], c["fx"], c["fy"], c["cx"], c["cy"],
+                c["width"], c["height"], c["format"], c["fx"], c["fy"], c["cx"], c["cy"],
                 c["horizontalFovDeg"], c["verticalFovDeg"], Mount.from_dict(c["mount"]),
                 np.array(c["opticalFromVehicle"]["R"], dtype=float).reshape(3, 3),
                 np.array(c["opticalFromVehicle"]["t"], dtype=float)),
             lidar=LidarCalibration(
-                l["rows"], l["cols"], l["rateHz"], l["maxRangeM"], Mount.from_dict(l["mount"]),
+                l["rows"], l["cols"], l["maxRangeM"], Mount.from_dict(l["mount"]),
                 np.array(l["elevationsDeg"], dtype=float), np.array(l["azimuthsDeg"], dtype=float)),
-            pose_rate_hz=d["poseRateHz"])
+            frame_rate_hz=d["frameRateHz"])
 
     @classmethod
     def from_json(cls, path_or_text) -> "Calibration":

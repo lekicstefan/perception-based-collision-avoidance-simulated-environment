@@ -60,7 +60,7 @@ public class PoseEstimator : MonoBehaviour
     {
         cfg = rig.Config.pose;
         noise = new PoseNoiseModel(cfg, rig.DerivedSeed("pose"));
-        schedule = new SensorSchedule(cfg.rateHz);
+        schedule = new SensorSchedule(rig.Config.frameRateHz);
         nextLog = logInterval;
     }
 

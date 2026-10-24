@@ -11,7 +11,7 @@ VERSION = 1
 MAGIC_SENSOR = b"AVPS"    # Unity to Python
 MAGIC_COMMAND = b"AVPC"   # Python to Unity
 
-PORT_SESSION, PORT_COMMAND, PORT_LIDAR, PORT_CAMERA, PORT_POSE, PORT_ORACLE = 5555, 5556, 5557, 5558, 5559, 5560
+PORT_SESSION, PORT_COMMAND, PORT_BUNDLE, PORT_ORACLE = 5555, 5556, 5557, 5560
 
 # magic, version, type, flags, seq, payload_length, t, x y z yaw pitch roll, speed yaw_rate steering, reserved
 HEADER = struct.Struct("<4sHBBIId6d3fI")
@@ -19,23 +19,24 @@ COMMAND_HEADER = struct.Struct("<4sHBBI")
 # id, data_timestamp, comfort_cap, safety_cap, comfort_decel, brake_request, validity, fallback_decel,
 # processing_time, emergency, risk_level, reserved
 COMMAND_PAYLOAD = struct.Struct("<IdfffffffBBH")
+BUNDLE_TIMING = struct.Struct("<IB3xqqq")     # frame id, flags, capture ns, built ns, sent ns
 LIDAR_PREFIX = struct.Struct("<HH")           # rows, cols
 CAMERA_PREFIX = struct.Struct("<HHB3x")       # width, height, format, 3 reserved bytes
 ORACLE_COUNT = struct.Struct("<I")
 ORACLE_DTYPE = np.dtype([("id", "<i4"), ("x", "<f8"), ("y", "<f8"), ("z", "<f8"), ("yaw", "<f8"),
                          ("vx", "<f8"), ("vy", "<f8"), ("length", "<f4"), ("width", "<f4"), ("height", "<f4")])
 
-assert HEADER.size == 88 and COMMAND_HEADER.size == 12 and COMMAND_PAYLOAD.size == 44
+assert HEADER.size == 88 and COMMAND_HEADER.size == 12 and COMMAND_PAYLOAD.size == 44 and BUNDLE_TIMING.size == 32
 assert LIDAR_PREFIX.size == 4 and CAMERA_PREFIX.size == 8 and ORACLE_DTYPE.itemsize == 64
+
+HAS_LIDAR, HAS_CAMERA = 1, 2
 
 
 class MsgType(IntEnum):
     HELLO = 1
     CALIBRATION = 2
     END_OF_RUN = 3
-    LIDAR = 4
-    CAMERA = 5
-    POSE = 6
+    BUNDLE = 4
     ORACLE = 7
 
 
@@ -54,7 +55,7 @@ SESSION_TYPES = (MsgType.HELLO, MsgType.CALIBRATION, MsgType.END_OF_RUN)
 
 
 class ProtocolError(ValueError):
-    """A message that does not follow docs/protocol.md."""
+    """A message that does not follow the protocol."""
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,17 @@ class CameraPayload:
     height: int
     format: CameraFormat
     data: memoryview
+
+
+@dataclass(frozen=True)
+class Bundle:
+    header: Header
+    frame_id: int
+    capture_ns: int          # Unity clock, same as time.perf_counter_ns() on this machine
+    built_ns: int
+    sent_ns: int
+    lidar: np.ndarray | None             # uint16 (rows, cols) centimetres, read-only view
+    camera: CameraPayload | None
 
 
 @dataclass(frozen=True)
@@ -121,46 +133,41 @@ def parse_header(msg) -> Header:
     return Header(mtype, seq, plen, t, x, y, z, yaw, pitch, roll, speed, yaw_rate, steering)
 
 
-def _expect(h: Header, mtype: MsgType) -> None:
-    if h.type != mtype:
-        raise ProtocolError(f"expected {mtype.name}, got {h.type.name}")
-
-
-def parse_pose(msg) -> Header:
-    h = parse_header(msg)
-    _expect(h, MsgType.POSE)
-    if h.payload_length != 0:
-        raise ProtocolError("POSE has no payload")
-    return h
-
-
-def parse_lidar(msg) -> tuple[Header, np.ndarray]:
-    """Returns the header and the range image as a read-only uint16 array (rows, cols), no copy."""
-    h = parse_header(msg)
-    _expect(h, MsgType.LIDAR)
-    if h.payload_length < LIDAR_PREFIX.size:
-        raise ProtocolError("LIDAR payload too short")
-    rows, cols = LIDAR_PREFIX.unpack_from(msg, HEADER.size)
-    if h.payload_length != LIDAR_PREFIX.size + 2 * rows * cols:
-        raise ProtocolError(f"LIDAR payload {h.payload_length} bytes does not fit {rows} x {cols}")
-    ranges = np.frombuffer(msg, dtype="<u2", count=rows * cols, offset=HEADER.size + LIDAR_PREFIX.size)
-    return h, ranges.reshape(rows, cols)
-
-
-def parse_camera(msg) -> tuple[Header, CameraPayload]:
-    h = parse_header(msg)
-    _expect(h, MsgType.CAMERA)
-    if h.payload_length < CAMERA_PREFIX.size:
-        raise ProtocolError("CAMERA payload too short")
-    width, height, fmt = CAMERA_PREFIX.unpack_from(msg, HEADER.size)
-    try:
-        fmt = CameraFormat(fmt)
-    except ValueError:
-        raise ProtocolError(f"unknown camera format {fmt}") from None
-    data = memoryview(msg)[HEADER.size + CAMERA_PREFIX.size:]
-    if fmt == CameraFormat.RAW and len(data) != width * height * 3:
-        raise ProtocolError(f"raw image of {len(data)} bytes does not fit {width} x {height}")
-    return h, CameraPayload(width, height, fmt, data)
+def parse_bundle(msg, h: Header | None = None) -> Bundle:
+    """Lidar is a numpy view into msg (no copy); the camera data is a memoryview (JPEG bytes or raw RGB)."""
+    h = h or parse_header(msg)
+    if h.type != MsgType.BUNDLE:
+        raise ProtocolError(f"expected BUNDLE, got {h.type.name}")
+    if h.payload_length < BUNDLE_TIMING.size:
+        raise ProtocolError("BUNDLE payload too short")
+    frame_id, flags, capture, built, sent = BUNDLE_TIMING.unpack_from(msg, HEADER.size)
+    pos = HEADER.size + BUNDLE_TIMING.size
+    lidar = camera = None
+    if flags & HAS_LIDAR:
+        if len(msg) < pos + LIDAR_PREFIX.size:
+            raise ProtocolError("BUNDLE lidar section too short")
+        rows, cols = LIDAR_PREFIX.unpack_from(msg, pos)
+        pos += LIDAR_PREFIX.size
+        if len(msg) < pos + 2 * rows * cols:
+            raise ProtocolError(f"BUNDLE lidar section does not fit {rows} x {cols}")
+        lidar = np.frombuffer(msg, dtype="<u2", count=rows * cols, offset=pos).reshape(rows, cols)
+        pos += 2 * rows * cols
+    if flags & HAS_CAMERA:
+        if len(msg) < pos + CAMERA_PREFIX.size:
+            raise ProtocolError("BUNDLE camera section too short")
+        width, height, fmt = CAMERA_PREFIX.unpack_from(msg, pos)
+        pos += CAMERA_PREFIX.size
+        try:
+            fmt = CameraFormat(fmt)
+        except ValueError:
+            raise ProtocolError(f"unknown camera format {fmt}") from None
+        data = memoryview(msg)[pos:]
+        if fmt == CameraFormat.RAW and len(data) != width * height * 3:
+            raise ProtocolError(f"raw image of {len(data)} bytes does not fit {width} x {height}")
+        camera = CameraPayload(width, height, fmt, data)
+    elif pos != len(msg):
+        raise ProtocolError("BUNDLE has trailing bytes")
+    return Bundle(h, frame_id, capture, built, sent, lidar, camera)
 
 
 def camera_to_rgb(cam: CameraPayload) -> np.ndarray:
@@ -191,7 +198,8 @@ def parse_session(msg) -> tuple[Header, dict]:
 def parse_oracle(msg) -> tuple[Header, np.ndarray]:
     """Oracle mode only. Returns the header and a structured array with one row per object."""
     h = parse_header(msg)
-    _expect(h, MsgType.ORACLE)
+    if h.type != MsgType.ORACLE:
+        raise ProtocolError(f"expected ORACLE, got {h.type.name}")
     if h.payload_length < ORACLE_COUNT.size:
         raise ProtocolError("ORACLE payload too short")
     (n,) = ORACLE_COUNT.unpack_from(msg, HEADER.size)
@@ -200,35 +208,11 @@ def parse_oracle(msg) -> tuple[Header, np.ndarray]:
     return h, np.frombuffer(msg, dtype=ORACLE_DTYPE, count=n, offset=HEADER.size + ORACLE_COUNT.size)
 
 
-# ------------------------------------------------ Unity to Python: building (tests, replay, fake Unity)
-
-def build_message(mtype: MsgType, seq: int, payload: bytes = b"", t: float = 0.0,
-                  pose=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0), speed: float = 0.0, yaw_rate: float = 0.0,
-                  steering_angle: float = 0.0) -> bytes:
-    x, y, z, yaw, pitch, roll = pose
-    return HEADER.pack(MAGIC_SENSOR, VERSION, int(mtype), 0, seq, len(payload), t, x, y, z, yaw, pitch, roll,
-                       speed, yaw_rate, steering_angle, 0) + payload
-
-
-def lidar_payload(ranges: np.ndarray) -> bytes:
-    rows, cols = ranges.shape
-    return LIDAR_PREFIX.pack(rows, cols) + np.ascontiguousarray(ranges, dtype="<u2").tobytes()
-
-
-def camera_payload(width: int, height: int, fmt: CameraFormat, data: bytes) -> bytes:
-    return CAMERA_PREFIX.pack(width, height, int(fmt)) + bytes(data)
-
+# ------------------------------------------------------------ Python to Unity: building and parsing
 
 def json_payload(obj: dict) -> bytes:
     return json.dumps(obj, separators=(",", ":")).encode("utf-8")
 
-
-def oracle_payload(objects: np.ndarray) -> bytes:
-    objects = np.ascontiguousarray(objects, dtype=ORACLE_DTYPE)
-    return ORACLE_COUNT.pack(len(objects)) + objects.tobytes()
-
-
-# ------------------------------------------------------------ Python to Unity: building and parsing
 
 def build_ready(run_dir: str | None = None) -> bytes:
     payload = json_payload({"run_dir": run_dir}) if run_dir else b""
