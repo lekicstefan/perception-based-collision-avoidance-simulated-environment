@@ -50,11 +50,11 @@ def main() -> None:
     if not un:
         print("no unity/latency.csv (Unity writes it when the run ends): only the Python side is shown\n")
 
-    n_unity = len(un["frame"]) if un else len(py["frame"])
-    frames = py["frame"].astype(int)
+    n_unity = len(un["t_ms"]) if un else len(py["t_ms"])
+    frames = py["t_ms"].astype(int)
     d = {k: v for k, v in py.items()}
     if un:
-        idx = {int(f): i for i, f in enumerate(un["frame"])}
+        idx = {int(f): i for i, f in enumerate(un["t_ms"])}
         sel = np.array([idx[f] for f in frames if f in idx])
         keep = np.array([f in idx for f in frames])
         d = {k: v[keep] for k, v in py.items()}

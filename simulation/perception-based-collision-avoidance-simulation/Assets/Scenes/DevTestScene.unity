@@ -1270,7 +1270,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 397811629}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a1e85589c10f4a546adbbd9f68961d60, type: 3}
   m_Name: 
@@ -2496,7 +2496,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &757825594
 Transform:
   m_ObjectHideFlags: 0
@@ -3044,9 +3044,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CommandExecutor
   vehicle: {fileID: 1128943756}
   driver: {fileID: 1128943761}
-  capGain: 1
-  enforceExpiry: 1
-  logCommands: 0
 --- !u!4 &935829885
 Transform:
   m_ObjectHideFlags: 0
@@ -6205,7 +6202,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ca2e0fa021e6164bbafe7c0d0774102, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ScenarioSettings
-  scenario: dev
+  scenario: drive_test
   editorOverrides: []
   vehicle: {fileID: 0}
   driver: {fileID: 0}

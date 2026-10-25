@@ -39,6 +39,7 @@ public class Vehicle : MonoBehaviour
     public double X { get { return px; } }
     public double Z { get { return pz; } }
     public double Heading { get { return psi; } }
+    public double Odometer { get; private set; }   // m, path length driven since the start (integral of the true speed)
 
     // Initial condition / test setter. Normal operation changes speed through RequestedAccel.
     public float Speed
@@ -153,6 +154,7 @@ public class Vehicle : MonoBehaviour
         }
         speed = vNew;
         float vAvg = 0.5f * (vOld + vNew); // distance this step = vAvg * dt
+        Odometer += vAvg * dt;
 
         // 4. steering actuator: rate limit (road-wheel angle)
         float steerOld = steer;

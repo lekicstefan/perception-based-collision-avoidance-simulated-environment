@@ -4,7 +4,6 @@ using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-// The scenario of the current run, for the loggers (RunLogger). Set by ScenarioSettings.
 public static class ScenarioContext
 {
     public static bool Loaded { get; private set; }
@@ -29,7 +28,6 @@ public static class ScenarioContext
 
 public static class ScenarioLoader
 {
-    // A misspelled key is an error. Null values in the file are ignored (the default stays).
     static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
     {
         MissingMemberHandling = MissingMemberHandling.Error,
@@ -53,8 +51,6 @@ public static class ScenarioLoader
         return names;
     }
 
-    // overrides: "path=value" strings applied to the JSON before it is read, for example driver.cruiseSpeedMps=11.1 or
-    // objects.CrossingVehicle.startDelayS=4.2 (a sweep point). The value is read as JSON (number, true, false) or else as text.
     public static ScenarioConfig Load(string nameOrPath, IList<string> overrides, out string sourcePath)
     {
         sourcePath = PathFor(nameOrPath);
@@ -146,7 +142,6 @@ public static class ScenarioLoader
         Positive(c, "vehicle.maxAccelMps2", c.vehicle.maxAccelMps2);
         Positive(c, "vehicle.maxBrakeMps2", c.vehicle.maxBrakeMps2);
         NonNegative(c, "vehicle.actuationDelayS", c.vehicle.actuationDelayS);
-        NonNegative(c, "executor.capGain", c.executor.capGain);
         NonNegative(c, "environment.fogVisibilityM", c.environment.fogVisibilityM);
         if (c.sensors.seed.HasValue && c.sensors.seed.Value < 0) throw new ArgumentException("Scenario '" + c.name + "': sensors.seed must be 0 or more");
         if (c.objects != null)

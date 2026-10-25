@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// Scripted driver: pure-pursuit steering and speed-profile following on a route.
-// It never reacts to obstacles. In 2.6 the command executor will sit between this and the vehicle.
 public class RouteDriver : MonoBehaviour
 {
     public Vehicle vehicle;
@@ -13,6 +11,7 @@ public class RouteDriver : MonoBehaviour
     public float maxLateralAccel = 3f;     // m/s^2, sets curve speeds
     public float comfortDecel = 2f;        // m/s^2, slowing before curves and the end
     public float comfortAccel = 1.5f;      // m/s^2
+    public float accelRise = 2f;           // m/s^3, how fast the requested acceleration may increase
     public float speedGain = 1f;           // 1/s, P gain on the speed error
     public float driverMaxBrake = 3f;      // m/s^2, the driver never uses emergency braking
 
@@ -28,6 +27,7 @@ public class RouteDriver : MonoBehaviour
     [Header("Output")]
     public bool writeAccelToVehicle = true; // the command executor switches this off and takes over
     public float DesiredAccel { get; private set; }
+    public void ResetAccel() { DesiredAccel = Mathf.Min(DesiredAccel, 0f); }
 
     public Route Track { get; private set; }
     public float S { get; private set; }            // arc length of the closest route point
@@ -113,7 +113,7 @@ public class RouteDriver : MonoBehaviour
         profile.At(S, out vTarget, out aFf);
         TargetSpeed = vTarget;
         float aReq = aFf + speedGain * (vTarget - vehicle.Speed);
-        DesiredAccel = Mathf.Clamp(aReq, -driverMaxBrake, vehicle.maxAccel);
+        DesiredAccel = Mathf.Min(Mathf.Clamp(aReq, -driverMaxBrake, vehicle.maxAccel), DesiredAccel + accelRise * Time.fixedDeltaTime);
         if (writeAccelToVehicle) vehicle.RequestedAccel = DesiredAccel;
     }
 }

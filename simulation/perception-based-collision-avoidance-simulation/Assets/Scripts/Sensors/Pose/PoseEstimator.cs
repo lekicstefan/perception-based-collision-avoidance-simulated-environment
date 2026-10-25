@@ -84,6 +84,7 @@ public class PoseEstimator : MonoBehaviour
             yaw = yaw,
             pitch = vehicle.PitchDeg * System.Math.PI / 180.0,
             roll = 0.0,
+            odometer = vehicle.Odometer,
             speed = vehicle.Speed,
             yawRate = vehicle.YawRate,
             steeringAngle = vehicle.SteeringAngle

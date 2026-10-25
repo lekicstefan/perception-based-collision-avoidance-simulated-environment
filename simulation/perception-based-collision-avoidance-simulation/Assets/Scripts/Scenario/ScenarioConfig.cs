@@ -1,10 +1,5 @@
 using System.Collections.Generic;
 
-// Scenario configuration (format: docs/scenarios.md). One scenario = one Unity scene (the world is built by hand in the
-// editor) + one JSON file in configs/scenarios (the parameters). Every parameter is optional: a missing one leaves the
-// value that is set on the component in the scene. The fully resolved configuration (every value that was actually
-// used) is what a run stores, see ScenarioSettings.
-// The JSON keys are exactly the field names below, a misspelled key is an error (ScenarioLoader).
 public class ScenarioConfig
 {
     public int schema = 1;
@@ -15,7 +10,6 @@ public class ScenarioConfig
 
     public DriverParams driver = new DriverParams();
     public VehicleParams vehicle = new VehicleParams();
-    public ExecutorParams executor = new ExecutorParams();
     public SensorParams sensors = new SensorParams();
     public EnvironmentParams environment = new EnvironmentParams();
     public Dictionary<string, ObjectParams> objects = new Dictionary<string, ObjectParams>();   // key = name of the scene object
@@ -50,13 +44,6 @@ public class VehicleParams
     public float? maxBrakeMps2;
     public float? actuationDelayS;
     public float? jerkLimitMps3;
-}
-
-// The command executor (CommandExecutor).
-public class ExecutorParams
-{
-    public float? capGain;                // 1/s
-    public bool? enforceExpiry;           // false = ablation "expiring commands off"
 }
 
 // Sensors: which sensor configuration file (configs/sensors) and which base seed. The command line (--sensors, --seed) wins.

@@ -3,15 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-// Reads the scenario file and applies it to the components of this scene, before they start. One of these per scene.
-//
-// Value precedence, strongest first:
-//   --set path=value on the command line  >  Editor Overrides below  >  the scenario file  >  the value set on the component in the scene.
-// --scenario NAME on the command line replaces the Scenario field; a scenario picked in the menu (ScenarioContext.Pick) replaces both. --sensors and --seed (SensorRig) still win over the scenario's sensors.
-//
-// Every run stores the resolved scenario (config/scenario_resolved.json, written by RunLogger): the value of every setting that was actually
-// used, including those the file did not mention. A bad scenario (missing file, misspelled key, impossible value, wrong scene) stops the run
-// before the handshake instead of running something else.
 [DefaultExecutionOrder(-300)]   // before SensorRig (-200) and Vehicle (-100), whose Awake read the values set here
 public class ScenarioSettings : MonoBehaviour
 {
@@ -66,7 +57,6 @@ public class ScenarioSettings : MonoBehaviour
         }
     }
 
-    // Start: every Awake has run, so the sensor rig knows its final configuration and seed.
     void Start()
     {
         if (cfg == null) return;
@@ -127,13 +117,6 @@ public class ScenarioSettings : MonoBehaviour
             Set(v.maxBrakeMps2, ref vehicle.maxBrake);
             Set(v.actuationDelayS, ref vehicle.actuationDelay);
             Set(v.jerkLimitMps3, ref vehicle.jerkLimit);
-        }
-
-        ExecutorParams e = c.executor;
-        if (e != null)
-        {
-            Set(e.capGain, ref executor.capGain);
-            Set(e.enforceExpiry, ref executor.enforceExpiry);
         }
 
         SensorParams s = c.sensors;
@@ -202,7 +185,6 @@ public class ScenarioSettings : MonoBehaviour
         return list;
     }
 
-    // The value of every setting as it is now (after Awake of every component), with nothing left out.
     ScenarioConfig BuildResolved()
     {
         var r = new ScenarioConfig
@@ -236,9 +218,6 @@ public class ScenarioSettings : MonoBehaviour
         r.vehicle.actuationDelayS = vehicle.actuationDelay;
         r.vehicle.jerkLimitMps3 = vehicle.jerkLimit;
 
-        r.executor.capGain = executor.capGain;
-        r.executor.enforceExpiry = executor.enforceExpiry;
-
         r.sensors.config = rig.Config != null ? rig.Config.name : rig.configName;   // final: the command line may have replaced it
         r.sensors.seed = rig.Seed;
 
@@ -267,7 +246,6 @@ public class ScenarioSettings : MonoBehaviour
         return r;
     }
 
-    // A scenario that cannot be used stops the run (editor: leaves play mode), so nothing runs under the wrong parameters.
     public static void Fail(Exception e)
     {
         UnityEngine.Debug.LogError("SCENARIO ERROR: " + e.Message + "\nThe run is stopped.");

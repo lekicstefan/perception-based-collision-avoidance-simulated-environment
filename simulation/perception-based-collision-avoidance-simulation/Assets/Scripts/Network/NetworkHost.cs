@@ -8,6 +8,14 @@ using UnityEngine;
 using Newtonsoft.Json.Linq;
 using Stopwatch = System.Diagnostics.Stopwatch;
 
+// Unity side of docs/protocol.md: sockets, handshake, heartbeat and shutdown.
+//
+// Threads: the main thread serializes sensor events into byte arrays (Protocol.Build*) and puts them in a queue.
+// One background thread owns every NetMQ socket: it sends from the queue, receives commands, runs the handshake and
+// sends the calibration heartbeat. Unity API calls stay on the main thread, sockets stay on the network thread.
+//
+// Run start: while waitForProcessor is on, Time.timeScale is 0 from Awake until the processor answers READY, so no
+// FixedUpdate runs (no sensors, no driving, no logging). Then timeScale becomes 1 and the run starts with seq 0.
 public class NetworkHost : MonoBehaviour
 {
     [Header("Scene wiring")]
@@ -30,7 +38,7 @@ public class NetworkHost : MonoBehaviour
     const int SocketBufferBytes = 64 * 1024;    // bounds how stale queued data can get (see the stall experiment)
     const int MaxQueued = 500;                  // safety net, the network thread normally keeps the queue near empty
 
-    struct Outgoing { public int socket; public byte[] data; public int frame; }   // frame = -1 for everything but bundles
+    struct Outgoing { public int socket; public byte[] data; public int frame; }   // frame = capture time in ms for bundles (the latency key), -1 for everything else
     struct Pending { public LidarScan scan; public CameraFrame frame; public long lidarReady, cameraReady; }
 
     readonly BlockingCollection<Outgoing> outgoing = new BlockingCollection<Outgoing>();
@@ -168,8 +176,10 @@ public class NetworkHost : MonoBehaviour
         byte[] msg = Protocol.BuildBundle(id, p.scan, p.frame, captureNs);
         long built = Latency.Ns();
         Protocol.Stamp(msg, Protocol.BundleBuiltOffset, built);
-        Latency.Frame((uint)id, p.scan != null ? p.scan.timestamp : p.frame.timestamp, captureNs, p.lidarReady, p.cameraReady, built, msg.Length);
-        Enqueue(SBundle, msg, id);
+        double simTime = p.scan != null ? p.scan.timestamp : p.frame.timestamp;
+        uint key = Latency.Key(simTime);
+        Latency.Frame(key, simTime, captureNs, p.lidarReady, p.cameraReady, built, msg.Length);
+        Enqueue(SBundle, msg, (int)key);
 
         // a part that never arrives (camera readback error, encoder queue full) must not keep a frame forever
         List<int> stale = null;
@@ -337,7 +347,7 @@ public class NetworkHost : MonoBehaviour
                 break;
             case Protocol.CmdType.Command:
                 Interlocked.Increment(ref commandsReceived);
-                Latency.CommandReceived(c.id, receivedNs);
+                Latency.CommandReceived(Latency.Key(c.dataTimestamp), receivedNs);
                 if (!ReferenceEquals(executorRef, null)) executorRef.Submit(c);   // Submit is safe from any thread
                 break;
             case Protocol.CmdType.Telemetry:

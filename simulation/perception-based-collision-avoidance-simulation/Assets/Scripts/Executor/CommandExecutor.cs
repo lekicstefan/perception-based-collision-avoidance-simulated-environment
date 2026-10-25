@@ -4,30 +4,26 @@ using UnityEngine;
 [DefaultExecutionOrder(5)] // after Vehicle (-100) and RouteDriver (0)
 public class CommandExecutor : MonoBehaviour
 {
-    public enum CommandStatus { NoCommand, Active, Expired }
-    public enum Rule { Driver, ComfortCap, SafetyCap, BrakeRequest, Emergency, Fallback, Released }
+    public enum Rule { Driver, Stop }
 
     public Vehicle vehicle;
     public RouteDriver driver;
-    public float capGain = 1f;          // 1/s, P gain when following a cap
-    public bool enforceExpiry = true;   // off = ablation "expiring commands off"
-    public bool logCommands = false;    // one log line per command; off, commands arrive every frame
 
-    public CommandStatus Status { get; private set; }
     public Rule AppliedRule { get; private set; }
-    public uint LastId { get; private set; }
     public float AppliedAccel { get; private set; }
-    public float Remaining { get; private set; }
-    public double AppliedAt { get; private set; }
-    public double ExpiredAt { get; private set; }
-    public double ExpiredX { get; private set; }
-    public double ExpiredZ { get; private set; }
+    public bool HasMessage { get; private set; }
+    public long ObjectId { get; private set; }          // -1 without a message
+    public float Brake { get; private set; }            // m/s^2, fixed when the message arrived
+    public float Remaining { get; private set; }        // m to the stop position
+    public bool Waiting { get; private set; }           // stopped with a message in force
+    public float DataAge { get; private set; }          // sim time from the capture of the newest command's data to its application
+    public int Ignored { get; private set; }            // commands that arrived after a newer one
 
     readonly ConcurrentQueue<VehicleCommand> incoming = new ConcurrentQueue<VehicleCommand>();
-    VehicleCommand active;
+    double lastTimestamp = double.NegativeInfinity;
+    StopMessage message;
 
     public void Submit(VehicleCommand c) { incoming.Enqueue(c); } // any thread
-    public void Clear() { Status = CommandStatus.NoCommand; }     // main thread
 
     void Start()
     {
@@ -36,85 +32,50 @@ public class CommandExecutor : MonoBehaviour
 
     void FixedUpdate()
     {
-        double now = SimClock.Now;
-
-        // 1. the newest submitted command wins
         VehicleCommand tmp, latest = default(VehicleCommand);
         bool got = false;
-        while (incoming.TryDequeue(out tmp)) { latest = tmp; got = true; }
+        while (incoming.TryDequeue(out tmp))
+        {
+            if (tmp.dataTimestamp <= lastTimestamp || (got && tmp.dataTimestamp <= latest.dataTimestamp)) { Ignored++; continue; }
+            latest = tmp;
+            got = true;
+        }
+
+        float v = vehicle.Speed;
         if (got)
         {
-            active = latest;
-            Status = CommandStatus.Active;
-            AppliedAt = now;
-            LastId = latest.id;
-            Latency.CommandApplied(latest.id, Latency.Ns());
-            if (logCommands)
-                UnityEngine.Debug.Log("COMMAND #" + latest.id + " applied | comfort cap " + latest.comfortCap.ToString("F1") +
-                    " | safety cap " + latest.safetyCap.ToString("F1") + " | comfort decel " + latest.comfortDecel.ToString("F1") +
-                    " | brake " + latest.brakeRequest.ToString("F1") + " | emergency " + latest.emergency +
-                    " | validity " + latest.validity.ToString("F2") + " s | fallback " + latest.fallbackDecel.ToString("F1"));
-        }
-
-        // 2. expiry in simulation time (half a step of tolerance against float rounding)
-        if (Status == CommandStatus.Active)
-        {
-            double age = now - AppliedAt;
-            Remaining = (float)System.Math.Max(0.0, active.validity - age);
-            if (enforceExpiry && age >= active.validity - 0.5 * Time.fixedDeltaTime)
+            lastTimestamp = latest.dataTimestamp;
+            DataAge = (float)(SimClock.Now - latest.dataTimestamp);
+            Latency.CommandApplied(Latency.Key(latest.dataTimestamp), Latency.Ns());
+            if (!latest.hasMessage)
             {
-                Status = CommandStatus.Expired;
-                ExpiredAt = now;
-                ExpiredX = vehicle.X;
-                ExpiredZ = vehicle.Z;
-                if (logCommands)
-                    UnityEngine.Debug.Log("COMMAND #" + active.id + " EXPIRED after " + age.ToString("F2") +
-                        " s | fallback decel " + active.fallbackDecel.ToString("F1"));
+                HasMessage = false;
+                ObjectId = -1;
+                Brake = 0f;
+            }
+            else if (!HasMessage || latest.message.objectId != message.objectId || latest.message.stop != message.stop)
+            {
+                // a new or changed message: the constant deceleration that stops the car at the stop position, worked out once
+                message = latest.message;
+                HasMessage = true;
+                ObjectId = message.objectId;
+                // the car keeps its speed until the actuation delay has passed, so that distance is not left for braking
+                float remaining = (float)(message.stop - vehicle.Odometer) - v * vehicle.actuationDelay;
+                Brake = remaining > 0f ? Mathf.Min(v * v / (2f * remaining), vehicle.maxBrake) : vehicle.maxBrake;
             }
         }
 
-        // 3. merge with the driver (the system can only brake)
+        Remaining = HasMessage ? (float)(message.stop - vehicle.Odometer) : 0f;
+        Waiting = HasMessage && v < 0.05f;
+
+        // the system can only brake
         float aDrv = driver != null ? driver.DesiredAccel : 0f;
-        float aOut = aDrv;
-        Rule rule = Rule.Driver;
-        float v = vehicle.Speed;
-
-        if (Status == CommandStatus.Expired)
-        {
-            if (active.fallbackDecel > 0f)
-            {
-                aOut = -Mathf.Min(active.fallbackDecel, vehicle.maxBrake);
-                rule = Rule.Fallback;
-            }
-            else rule = Rule.Released;
-        }
-        else if (Status == CommandStatus.Active)
-        {
-            if (active.emergency)
-            {
-                aOut = -vehicle.maxBrake;
-                rule = Rule.Emergency;
-            }
-            else if (active.brakeRequest > 0f)
-            {
-                aOut = -Mathf.Min(active.brakeRequest, vehicle.maxBrake);
-                rule = Rule.BrakeRequest;
-            }
-            else
-            {
-                float aComf = Mathf.Clamp(capGain * (active.comfortCap - v), -Mathf.Max(0f, active.comfortDecel), vehicle.maxAccel);
-                float aSafe = Mathf.Clamp(capGain * (active.safetyCap - v), -vehicle.maxBrake, vehicle.maxAccel);
-                float lim = Mathf.Min(aComf, aSafe);
-                if (aDrv > lim)
-                {
-                    aOut = lim;
-                    rule = (aComf <= aSafe) ? Rule.ComfortCap : Rule.SafetyCap;
-                }
-            }
-        }
-
-        AppliedRule = rule;
+        float aOut = HasMessage ? Mathf.Min(aDrv, -Brake) : aDrv;
+        AppliedRule = HasMessage ? Rule.Stop : Rule.Driver;
         AppliedAccel = aOut;
         vehicle.RequestedAccel = aOut;
+
+        // while braking the driver does not wind up: its acceleration starts again from zero after the release
+        if (HasMessage && driver != null) driver.ResetAccel();
     }
 }

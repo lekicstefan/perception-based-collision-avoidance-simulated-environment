@@ -7,8 +7,8 @@ public static class Protocol
     public const ushort Version = 1;
     public const int HeaderSize = 88;
     public const int CommandHeaderSize = 12;
-    public const int CommandPayloadSize = 44;
-    public const int BundleTimingSize = 32;      // frame id, flags, capture / built / sent time stamps
+    public const int CommandPayloadSize = 24;
+    public const int BundleTimingSize = 40;      // frame id, flags, capture / built / sent time stamps, odometer
     public const int BundleBuiltOffset = HeaderSize + 16, BundleSentOffset = HeaderSize + 24;
     public const byte BundleHasLidar = 1, BundleHasCamera = 2;
     public const int OracleRecordSize = 64;
@@ -75,8 +75,6 @@ public static class Protocol
         public double F64() { return BitConverter.Int64BitsToDouble(unchecked((long)U64())); }
     }
 
-    // Starts a Unity-to-Python message: allocates header + payload and writes the 88-byte header.
-    // The pose fields are the ego pose at the capture step of the message (all zero on session messages).
     static Writer NewMessage(MsgType type, uint seq, int payloadLength, double t, PoseState pose)
     {
         var w = new Writer(HeaderSize + payloadLength);
@@ -98,7 +96,8 @@ public static class Protocol
     // ------------------------------------------------------------------ Unity to Python: building
 
     // One message per frame: the header carries the capture time and the pose of the frame; the payload is
-    //   timing block (32 bytes): frame id u32, flags u8 (1 lidar, 2 camera), 3 reserved, capture ns i64, built ns i64, sent ns i64
+    //   timing block (40 bytes): frame id u32, flags u8 (1 lidar, 2 camera), 3 reserved, capture ns i64, built ns i64, sent ns i64,
+    //   odometer f64 (the car's own path length at capture, m)
     //   lidar section (if flag 1): rows u16, cols u16, ranges u16 x rows*cols
     //   camera section (if flag 2, runs to the end): width u16, height u16, format u8 (0 jpeg, 1 raw), 3 reserved, data
     // The time stamps are Stopwatch ticks in ns (the Windows performance counter, shared with Python's perf_counter_ns).
@@ -129,6 +128,7 @@ public static class Protocol
         w.U64((ulong)captureNs);
         w.U64(0);                         // built, see Stamp
         w.U64(0);                         // sent, see Stamp
+        w.F64(pose.odometer);
         if (s != null)
         {
             w.U16((ushort)s.rows);
@@ -223,19 +223,13 @@ public static class Protocol
                 return true;
 
             case CmdType.Command:
+                // data timestamp f64, has message u8, 3 reserved, object id u32, stop position f64
                 if (length != CommandPayloadSize) { error = "COMMAND payload has the wrong size"; return false; }
-                cmd.id = r.U32();
                 cmd.dataTimestamp = r.F64();
-                cmd.comfortCap = r.F32();
-                cmd.safetyCap = r.F32();
-                cmd.comfortDecel = r.F32();
-                cmd.brakeRequest = r.F32();
-                cmd.validity = r.F32();
-                cmd.fallbackDecel = r.F32();
-                cmd.processingTime = r.F32();
-                cmd.emergency = r.U8() != 0;
-                cmd.riskLevel = r.U8();
-                r.U16();                  // reserved
+                cmd.hasMessage = r.U8() != 0;
+                r.U8(); r.U16();
+                cmd.message.objectId = r.U32();
+                cmd.message.stop = r.F64();
                 return true;
 
             default:                      // Telemetry

@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "name": "drive_test",
+  "description": "Test of the car-side controller: a long quiet drive on a straight street. The echo processor in drive mode adds, tightens, loosens and removes stop messages on a timeline and the report shows how the car follows them.",
+  "scene": "S7_NegativeControl",
+  "systemVariant": "default",
+  "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 13.9, "initialSpeedMps": 13.9 },
+  "sensors": { "config": "default", "seed": 12345 },
+  "environment": { "fogVisibilityM": 0 },
+  "objects": {
+    "OncomingCar": { "speedMps": 13.9 }
+  },
+  "end": { "timeoutS": 70, "stoppedForS": 0 }
+}

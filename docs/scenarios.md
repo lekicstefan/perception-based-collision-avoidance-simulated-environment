@@ -28,7 +28,6 @@ Every key is optional. A missing key leaves the scene's own value, so a scenario
 | `systemVariant` | processor variant, `default` for now (phase 9); only recorded |
 | `driver` | `route`, `cruiseSpeedMps`, `initialSpeedMps` (speed at the start of the route, 0 or missing = from rest), `maxLateralAccelMps2`, `comfortDecelMps2`, `comfortAccelMps2`, `speedGain`, `driverMaxBrakeMps2`, `lookaheadMinM`, `lookaheadPerSpeedS`, `lookaheadMaxM`, `endMarginM` (the scripted driver, `RouteDriver`) |
 | `vehicle` | `wheelbaseM`, `maxSteeringDeg`, `maxSteeringRateDegPerS`, `maxAccelMps2`, `maxBrakeMps2`, `actuationDelayS`, `jerkLimitMps3` (`Vehicle`) |
-| `executor` | `capGain`, `enforceExpiry` (`CommandExecutor`) |
 | `sensors` | `config` (file in `configs/sensors`), `seed` (base seed of every noise generator) |
 | `environment` | `fogVisibilityM` (0 = clear) |
 | `objects` | map: name of a scene object to its motion script (a `WaypointMover`), see below |
@@ -138,4 +137,4 @@ Views (`ViewControls`, debug only, never sent to the processor): `1`-`9` or `W` 
 
 - The processor assumes the braking capability measured in phase 2 (8 m/s^2, 0.15 s effective delay). `vehicle.maxBrakeMps2` and `vehicle.actuationDelayS` are in the file so that a run documents the car it used; changing them changes the car, not the processor's model.
 - The scenario does not set the processor's options (`--passing-speed-kmh`, `--pin`, pose noise sigmas). The batch runner passes those.
-- `dev` is the reference file for the development scene. The core scenarios are listed below (see `docs/scenery.md` for the scenery tools).
+- `dev` is the reference file for the development scene, `dev_trigger` tests the triggers and speed events there. The core scenarios are listed below (see `docs/scenery.md` for the scenery tools).

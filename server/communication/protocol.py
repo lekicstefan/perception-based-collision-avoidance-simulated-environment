@@ -16,17 +16,16 @@ PORT_SESSION, PORT_COMMAND, PORT_BUNDLE, PORT_ORACLE = 5555, 5556, 5557, 5560
 # magic, version, type, flags, seq, payload_length, t, x y z yaw pitch roll, speed yaw_rate steering, reserved
 HEADER = struct.Struct("<4sHBBIId6d3fI")
 COMMAND_HEADER = struct.Struct("<4sHBBI")
-# id, data_timestamp, comfort_cap, safety_cap, comfort_decel, brake_request, validity, fallback_decel,
-# processing_time, emergency, risk_level, reserved
-COMMAND_PAYLOAD = struct.Struct("<IdfffffffBBH")
-BUNDLE_TIMING = struct.Struct("<IB3xqqq")     # frame id, flags, capture ns, built ns, sent ns
+# data_timestamp, has message, 3 reserved, object id, stop position
+COMMAND_PAYLOAD = struct.Struct("<dB3xId")
+BUNDLE_TIMING = struct.Struct("<IB3xqqqd")    # frame id, flags, capture ns, built ns, sent ns, odometer (m)
 LIDAR_PREFIX = struct.Struct("<HH")           # rows, cols
 CAMERA_PREFIX = struct.Struct("<HHB3x")       # width, height, format, 3 reserved bytes
 ORACLE_COUNT = struct.Struct("<I")
 ORACLE_DTYPE = np.dtype([("id", "<i4"), ("x", "<f8"), ("y", "<f8"), ("z", "<f8"), ("yaw", "<f8"),
                          ("vx", "<f8"), ("vy", "<f8"), ("length", "<f4"), ("width", "<f4"), ("height", "<f4")])
 
-assert HEADER.size == 88 and COMMAND_HEADER.size == 12 and COMMAND_PAYLOAD.size == 44 and BUNDLE_TIMING.size == 32
+assert HEADER.size == 88 and COMMAND_HEADER.size == 12 and COMMAND_PAYLOAD.size == 24 and BUNDLE_TIMING.size == 40
 assert LIDAR_PREFIX.size == 4 and CAMERA_PREFIX.size == 8 and ORACLE_DTYPE.itemsize == 64
 
 HAS_LIDAR, HAS_CAMERA = 1, 2
@@ -94,24 +93,21 @@ class Bundle:
     capture_ns: int          # Unity clock, same as time.perf_counter_ns() on this machine
     built_ns: int
     sent_ns: int
+    odometer: float          # the car's own path length at capture (m)
     lidar: np.ndarray | None             # uint16 (rows, cols) centimetres, read-only view
     camera: CameraPayload | None
 
 
 @dataclass(frozen=True)
-class Command:
-    id: int
-    data_timestamp: float
-    comfort_cap: float
-    safety_cap: float
-    comfort_decel: float
-    brake_request: float
-    validity: float
-    fallback_decel: float
-    processing_time: float
-    emergency: bool
-    risk_level: int
+class StopMessage:
+    object_id: int
+    stop: float          # odometer reading (m) the car must stand still before
 
+
+@dataclass(frozen=True)
+class Command:
+    data_timestamp: float                # capture time of the data it is based on (the bundle header's t); a newer command replaces an older one
+    message: StopMessage | None = None   # None: nothing threatens the car
 
 # ---------------------------------------------------------------- Unity to Python: parsing
 
@@ -140,7 +136,7 @@ def parse_bundle(msg, h: Header | None = None) -> Bundle:
         raise ProtocolError(f"expected BUNDLE, got {h.type.name}")
     if h.payload_length < BUNDLE_TIMING.size:
         raise ProtocolError("BUNDLE payload too short")
-    frame_id, flags, capture, built, sent = BUNDLE_TIMING.unpack_from(msg, HEADER.size)
+    frame_id, flags, capture, built, sent, odometer = BUNDLE_TIMING.unpack_from(msg, HEADER.size)
     pos = HEADER.size + BUNDLE_TIMING.size
     lidar = camera = None
     if flags & HAS_LIDAR:
@@ -167,7 +163,7 @@ def parse_bundle(msg, h: Header | None = None) -> Bundle:
         camera = CameraPayload(width, height, fmt, data)
     elif pos != len(msg):
         raise ProtocolError("BUNDLE has trailing bytes")
-    return Bundle(h, frame_id, capture, built, sent, lidar, camera)
+    return Bundle(h, frame_id, capture, built, sent, odometer, lidar, camera)
 
 
 def camera_to_rgb(cam: CameraPayload) -> np.ndarray:
@@ -207,7 +203,6 @@ def parse_oracle(msg) -> tuple[Header, np.ndarray]:
         raise ProtocolError(f"ORACLE payload {h.payload_length} bytes does not fit {n} objects")
     return h, np.frombuffer(msg, dtype=ORACLE_DTYPE, count=n, offset=HEADER.size + ORACLE_COUNT.size)
 
-
 # ------------------------------------------------------------ Python to Unity: building and parsing
 
 def json_payload(obj: dict) -> bytes:
@@ -220,9 +215,8 @@ def build_ready(run_dir: str | None = None) -> bytes:
 
 
 def build_command(c: Command) -> bytes:
-    payload = COMMAND_PAYLOAD.pack(c.id, c.data_timestamp, c.comfort_cap, c.safety_cap, c.comfort_decel,
-                                   c.brake_request, c.validity, c.fallback_decel, c.processing_time,
-                                   1 if c.emergency else 0, c.risk_level, 0)
+    m = c.message
+    payload = COMMAND_PAYLOAD.pack(c.data_timestamp, 1 if m else 0, m.object_id if m else 0, m.stop if m else 0.0)
     return COMMAND_HEADER.pack(MAGIC_COMMAND, VERSION, int(CmdType.COMMAND), 0, len(payload)) + payload
 
 
@@ -256,8 +250,8 @@ def parse_command_message(msg) -> tuple[CmdType, object]:
     if ctype == CmdType.COMMAND:
         if plen != COMMAND_PAYLOAD.size:
             raise ProtocolError("COMMAND payload has the wrong size")
-        (cid, ts, comf, safe, cdec, brk, val, fb, proc, emg, risk, _r) = COMMAND_PAYLOAD.unpack_from(msg, COMMAND_HEADER.size)
-        return ctype, Command(cid, ts, comf, safe, cdec, brk, val, fb, proc, bool(emg), risk)
+        ts, has, oid, stop = COMMAND_PAYLOAD.unpack_from(msg, COMMAND_HEADER.size)
+        return ctype, Command(ts, StopMessage(oid, stop) if has else None)
     try:
         return ctype, json.loads(bytes(memoryview(msg)[COMMAND_HEADER.size:]).decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as e:

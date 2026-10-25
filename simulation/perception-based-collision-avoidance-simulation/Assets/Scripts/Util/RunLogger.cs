@@ -4,16 +4,9 @@ using System.IO;
 using Newtonsoft.Json;
 using UnityEngine;
 
-// Run metadata and the Unity-side logs of a run (step 4.7): run.json, copies of the configuration used (sensors and, since 8.1, the resolved scenario), the commands
-// as applied by the executor, and frame times. Ground truth is written into the same folder by GroundTruthLogger.
-// Nothing is opened until the processor has said (READY) whether there is a run folder; without one this component
-// switches itself off.
 [DefaultExecutionOrder(50)]   // after the executor (5) and the ground-truth logger (30)
 public class RunLogger : MonoBehaviour
 {
-    // The command line without anything that could be a credential: Unity Hub passes the editor a session token (-accessToken) and similar
-    // arguments, and run.json must be safe to share. Kept: the executable, our own arguments (--name value) and a few harmless Unity arguments;
-    // everything else is only counted.
     static readonly HashSet<string> SafeUnityArgs = new HashSet<string>
     {
         "-batchmode", "-nographics", "-screen-width", "-screen-height", "-screen-fullscreen", "-logFile", "-projectPath"
@@ -69,7 +62,7 @@ public class RunLogger : MonoBehaviour
         if (ScenarioContext.Loaded && ScenarioContext.ResolvedJson != null)
             File.WriteAllText(Path.Combine(RunFolder.ConfigCopyDir, "scenario_resolved.json"), ScenarioContext.ResolvedJson);
         commands = new StreamWriter(Path.Combine(RunFolder.UnityDir, "commands.csv"));
-        commands.WriteLine("t,status,rule,last_id,applied_accel,remaining");
+        commands.WriteLine("t,speed,accel,jerk,driver_accel,applied_accel,rule,data_age_s,object_id,brake,waiting,remaining,odometer");
         frames = new StreamWriter(Path.Combine(RunFolder.UnityDir, "frames.csv"));
         frames.WriteLine("real_s,sim_s,frame_ms");
         WriteRunJson(false, "");
@@ -106,8 +99,10 @@ public class RunLogger : MonoBehaviour
         if (closed || !opened) return;
         if (timeScaleDuringRun < 0f) timeScaleDuringRun = Time.timeScale;
         if (executor != null)
-            commands.WriteLine(R(SimClock.Now) + "," + executor.Status + "," + executor.AppliedRule + "," +
-                               executor.LastId + "," + R(executor.AppliedAccel) + "," + R(executor.Remaining));
+            commands.WriteLine(R(SimClock.Now) + "," + R(executor.vehicle.Speed) + "," + R(executor.vehicle.Accel) + "," + R(executor.vehicle.Jerk) + "," +
+                               R(executor.driver != null ? executor.driver.DesiredAccel : 0f) + "," + R(executor.AppliedAccel) + "," + executor.AppliedRule + "," +
+                               R(executor.DataAge) + "," + executor.ObjectId + "," + R(executor.Brake) + "," + (executor.Waiting ? 1 : 0) + "," +
+                               R(executor.Remaining) + "," + R(executor.vehicle.Odometer));
 
         if (RunControl.Ended) { Close(); return; }
         if (Time.realtimeSinceStartupAsDouble >= nextFlush)
