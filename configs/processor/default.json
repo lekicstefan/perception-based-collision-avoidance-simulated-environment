@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "name": "default",
+  "ground": {
+    "noiseTolM": 0.06,
+    "slopeErrorDeg": 4.0,
+    "curvature": 0.003,
+    "startTolM": 0.30,
+    "curbHeightM": 0.15,
+    "curbReachM": 3.0,
+    "closeReachM": 8.0,
+    "closeSlopeDeg": 8.0,
+    "slopeMaxDeg": 15.0,
+    "slopeMemoryM": 5.0,
+    "behindTolM": 0.5,
+    "minMoveM": 0.05,
+    "rowWindow": 15,
+    "rowPercentile": 35,
+    "rowOutlierM": 0.25,
+    "footSlopeDeg": 60
+  },
+  "building": {
+    "lineTolM": 0.3,
+    "minHeightM": 2.0,
+    "minGapM": 2.0,
+    "houghAngleDeg": 1.0,
+    "houghRhoM": 0.3,
+    "minPoints": 6,
+    "minLengthM": 8.0,
+    "maxLines": 12
+  },
+  "messages": {
+    "minBrake": 1.0
+  },
+  "debug": {
+    "keepEvery": 1,
+    "keepMax": 1200
+  }
+}

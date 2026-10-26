@@ -5,7 +5,7 @@
   "scene": "S7_NegativeControl",
   "systemVariant": "default",
   "driver": { "route": "routes/scn_straight_300.json", "cruiseSpeedMps": 13.9, "initialSpeedMps": 13.9 },
-  "sensors": { "config": "default", "seed": 12345 },
+  "sensors": { "config": "perfect", "seed": 12345 },
   "environment": { "fogVisibilityM": 0 },
   "objects": {
     "OncomingCar": { "speedMps": 13.9 }
