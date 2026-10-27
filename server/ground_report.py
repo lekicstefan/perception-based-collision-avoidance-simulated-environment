@@ -25,7 +25,7 @@ def main() -> None:
     ap.add_argument("--reach", type=float, default=6.0, help="pixels around a lidar point that take its tint")
     args = ap.parse_args()
     run = Path(args.run) / "python"
-    stages, frames, building = run / "stages.csv", run / "ground_frames.npz", run / "building_lines.npz"
+    stages, frames, building = run / "stages.csv", run / "ground_frames.npz", run / "building_surfaces.npz"
     if not stages.exists() or not frames.exists():
         sys.exit(f"no {stages} or {frames}: run the processor first")
 
@@ -101,10 +101,11 @@ def main() -> None:
     cam_w, cam_h, cam_fmt = (int(v) for v in z["camera_format"])
     offsets, cam_data = z["camera_offsets"], z["camera_data"]
     cmap = ListedColormap([COLOURS[k] for k in (NONE, GROUND, OTHER, BUILDING)])
-    line_times, line_sets = (None, None)
+    surface_times = None
     if building.exists():
         b = np.load(building)
-        line_times, line_sets = b["t"], b["lines"]
+        surface_times, link_array, surface_array = b["t"], b["links"], b["surfaces"]
+        link_offsets, surface_offsets = np.concatenate([[0], np.cumsum(b["link_counts"])]), np.concatenate([[0], np.cumsum(b["surface_counts"])])
     print(f"\n{len(chosen)} pictures:")
     for k in chosen:
         hit = hit_all[k]
@@ -122,7 +123,7 @@ def main() -> None:
         ax[1].imshow(labels[k], cmap=cmap, vmin=0, vmax=3, aspect="auto", interpolation="nearest")
         ax[1].set_title("lidar cells (row 0 on top is the highest beam, left is the left of the car)  grey no return or no hit, green ground, red other, blue building")
         for panel, (u, v, name) in zip(ax[2:], [(lat[k], fwd[k], "from above: y (m, positive = left, on the left), x forward (m)"),
-                                                (lat[k], fwd[k], "from above, with the lines of the Hough transform"),
+                                                (lat[k], fwd[k], "from above, with the surfaces: black = building, orange = removed by the ground check, grey = not a building, numbers are areas in m2"),
                                                 (fwd[k], height[k], "from the side: x forward (m), height (m)")]):
             for kk in (GROUND, OTHER, BUILDING):
                 m = hit & (labels[k] == kk)
@@ -133,10 +134,18 @@ def main() -> None:
             panel.set_xlim(25, -25)
             panel.set_ylim(0, 60)
             panel.set_aspect("equal")
-        if line_times is not None:
-            for x0, y0, x1, y1 in line_sets[int(np.argmin(np.abs(line_times - times[k])))]:
-                if not np.isnan(x0):
-                    ax[3].plot([y0, y1], [x0, x1], color="black", linewidth=1.5)
+        if surface_times is not None:
+            s = int(np.argmin(np.abs(surface_times - times[k])))
+            links = link_array[link_offsets[s]:link_offsets[s + 1]]
+            surfaces = surface_array[surface_offsets[s]:surface_offsets[s + 1]]
+            shade = {0: "#888888", 1: "black", 2: "tab:orange"}
+            for x0, y0, x1, y1, status in sorted(links.tolist(), key=lambda l: l[4] == 1):
+                ax[3].plot([y0, y1], [x0, x1], color=shade[int(status)], linewidth=1.0 if status == 0 else 2.0)
+            for cx, cy, area, status in surfaces:
+                if area >= 5.0:
+                    ax[3].text(cy, cx, f"{area:.0f}", fontsize=7, color=shade[int(status)])
+            biggest = sorted(surfaces.tolist(), key=lambda s_: -s_[2])[:8]
+            print(f"  t = {times[k]:.2f} s, largest surfaces (m2, * = building, x = removed by the ground check): " + ", ".join(f"{a:.0f}{' *x'[int(st)]}".rstrip() for _, _, a, st in biggest))
         ax[4].set_xlim(0, 60)
         ax[4].set_ylim(-1, 4)
         fig.tight_layout()

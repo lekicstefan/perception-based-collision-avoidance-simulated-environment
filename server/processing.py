@@ -131,23 +131,22 @@ class BuildingStage:
 
     def __init__(self, calibration: Calibration, config: ProcessorConfig):
         self.finder = BuildingFinder(RangeImageBuilder(calibration.lidar).geometry, config.building)
-        self.max_lines = config.building.max_lines
-        self.kept_t, self.kept_lines = [], []        # the lines of every scan, for the report
+        self.kept_t, self.kept_links, self.kept_surfaces = [], [], []        # of every scan, for the report
 
     def process(self, frame: Frame) -> None:
         if frame.ground is None:
             return
         # changes the array in place: the ground stage keeps the same array for the report, so the report shows the buildings too
         self.finder.mark(frame.image, frame.ground)
-        lines = np.full((self.max_lines, 4), np.nan)
-        for k, line in enumerate(self.finder.lines):
-            lines[k] = line
         self.kept_t.append(frame.header.t)
-        self.kept_lines.append(lines)
+        self.kept_links.append(self.finder.links)
+        self.kept_surfaces.append(self.finder.surfaces)
 
     def save(self, run_dir: Path) -> None:
         if self.kept_t:
-            np.savez_compressed(run_dir / "building_lines.npz", t=np.array(self.kept_t), lines=np.stack(self.kept_lines))
+            np.savez_compressed(run_dir / "building_surfaces.npz", t=np.array(self.kept_t),
+                                link_counts=np.array([len(k) for k in self.kept_links]), links=np.concatenate(self.kept_links),
+                                surface_counts=np.array([len(k) for k in self.kept_surfaces]), surfaces=np.concatenate(self.kept_surfaces))
 
 
 class MessageBook:

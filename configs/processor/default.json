@@ -21,13 +21,14 @@
   },
   "building": {
     "lineTolM": 0.3,
-    "minHeightM": 2.0,
-    "minGapM": 2.0,
-    "houghAngleDeg": 1.0,
-    "houghRhoM": 0.3,
-    "minPoints": 6,
-    "minLengthM": 8.0,
-    "maxLines": 12
+    "lineMinPoints": 3,
+    "linkGapM": 1.0,
+    "flatTolM": 0.3,
+    "minAreaM2": 20.0,
+    "cornerAngleTolDeg": 15.0,
+    "cornerMinLines": 3,
+    "sideOffsetM": 3.0,
+    "removeByGround": false
   },
   "messages": {
     "minBrake": 1.0
